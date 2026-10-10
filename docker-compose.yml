@@ -6,11 +6,5 @@ services:
     environment:
       BACKEND_PORT: ${BACKEND_PORT:-8000}
     ports:
-      # port machine (configurable dans .env) : port conteneur
       - "${BACKEND_HOST_PORT:-8000}:${BACKEND_PORT:-8000}"
     restart: unless-stopped
-
-  # Services à venir :
-  # frontend: Angular + material-chessboard
-  # mongodb:  sessions, historique, cache des API
-  # milvus:   recherche vectorielle (+ etcd, minio)

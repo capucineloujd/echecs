@@ -5,6 +5,11 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     BACKEND_PORT=8000
 
+# Stockfish (version figée du dépôt Debian bookworm)
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends stockfish=15.1-4 \
+    && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
 
 COPY requirements.txt .
