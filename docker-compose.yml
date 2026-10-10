@@ -1,0 +1,12 @@
+services:
+  backend:
+    build: ./backend
+    container_name: echecs-backend
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+
+  # Services à venir :
+  # frontend: Angular + material-chessboard
+  # mongodb:  sessions, historique, cache des API
+  # milvus:   recherche vectorielle (+ etcd, minio)
