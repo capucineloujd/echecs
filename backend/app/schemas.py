@@ -54,3 +54,31 @@ class MovesResponse(BaseModel):
     moves: list[TheoryMove] = []
     engine: Evaluation | None = Field(None, description="Rempli quand la position est hors théorie")
     warning: str | None = None
+
+
+class OpeningRef(BaseModel):
+    slug: str
+    name: str
+    eco: str
+    moves: str
+    fen: str
+
+
+class Passage(BaseModel):
+    score: float = Field(description="Similarité cosinus (1 = identique)")
+    opening_slug: str
+    opening_name: str
+    eco: str
+    section: str
+    source: Literal["wikibooks", "wikipedia_fr"]
+    lang: str
+    url: str
+    text: str
+
+
+class VectorSearchResponse(BaseModel):
+    query: str
+    detected_opening: OpeningRef | None = Field(None, description="Ouverture reconnue dans la question")
+    filtered_by_opening: bool = Field(description="La recherche a été restreinte à cette ouverture")
+    results: list[Passage]
+    context: str = Field(description="Passages formatés, prêts pour un prompt LLM")

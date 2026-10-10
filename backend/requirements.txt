@@ -3,3 +3,7 @@ uvicorn[standard]==0.34.2
 pydantic-settings==2.9.1
 chess==1.11.2
 httpx==0.28.1
+pymilvus==2.6.17
+sentence-transformers==6.1.0
+transformers==5.19.0
+langgraph==1.2.14

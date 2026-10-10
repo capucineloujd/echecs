@@ -33,5 +33,26 @@ class Settings(BaseSettings):
     stockfish_threads: int = 2
     stockfish_hash_mb: int = 128
 
+    # Milvus (nom du service dans le réseau Docker)
+    milvus_uri: str = "http://milvus:19530"
+    milvus_collection: str = "opening_chunks"
+
+    # Embeddings
+    embedding_model: str = "Qwen/Qwen3-Embedding-0.6B"
+    embedding_batch_size: int = 16
+    # Threads CPU pour torch : on en laisse pour Milvus (sinon il perd son bail etcd)
+    embedding_threads: int = 4
+    # Consigne ajoutée aux requêtes (recommandé par Qwen3-Embedding, pas aux documents)
+    embedding_query_instruction: str = (
+        "Instruct: Given a chess player's question, retrieve encyclopedia passages "
+        "about chess openings that answer it\nQuery: "
+    )
+
+    # RAG
+    rag_top_k: int = 5
+    # Similarité cosinus minimale pour garder un passage
+    rag_min_score: float = 0.35
+    chunk_max_chars: int = 1200
+
 
 settings = Settings()

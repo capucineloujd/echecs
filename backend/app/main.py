@@ -2,7 +2,8 @@ import logging
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
-from app.api.v1 import evaluate, health, moves
+import asyncio
+from app.api.v1 import evaluate, health, moves, vector_search
 from app.config import settings
 from app.core.errors import (
     EngineError,
@@ -10,9 +11,13 @@ from app.core.errors import (
     LichessAuthError,
     LichessRateLimitError,
     LichessUnavailableError,
+    VectorStoreError,
 )
 from app.services.lichess import LichessExplorerService
+from app.rag.catalog import OpeningCatalog
+from app.rag.graph import build_rag_graph
 from app.services.stockfish import StockfishService
+from app.services.vector_store import VectorStoreService
 
 
 logging.basicConfig(level=logging.INFO)
@@ -28,7 +33,24 @@ async def lifespan(app: FastAPI):
     except EngineError as exc:
         # L'API démarre quand même : le moteur sera relancé à la 1ere requête
         logger.error("%s", exc)
+    app.state.vector_store = VectorStoreService(settings.milvus_uri, settings.milvus_collection)
+    try:
+        # Import tardif : torch est long à charger, inutile pour /moves et /evaluate
+        from app.services.embeddings import EmbeddingService
+
+        embedder = await asyncio.to_thread(
+            EmbeddingService,
+            settings.embedding_model,
+            settings.embedding_batch_size,
+            settings.embedding_threads,
+            settings.embedding_query_instruction,
+        )
+        app.state.rag_graph = build_rag_graph(embedder, app.state.vector_store, OpeningCatalog.load())
+    except Exception as exc:
+        # L'API reste utilisable sans RAG : /vector-search renverra 503
+        logger.error("RAG désactivé : %s", exc)
     yield
+    app.state.vector_store.close()
     await app.state.stockfish.stop()
     await app.state.lichess.close()
 
@@ -38,6 +60,7 @@ app = FastAPI(title=settings.app_name, lifespan=lifespan)
 app.include_router(health.router, prefix=settings.api_v1_prefix)
 app.include_router(moves.router, prefix=settings.api_v1_prefix)
 app.include_router(evaluate.router, prefix=settings.api_v1_prefix)
+app.include_router(vector_search.router, prefix=settings.api_v1_prefix)
 
 
 @app.exception_handler(InvalidFenError)
@@ -59,6 +82,7 @@ async def lichess_auth_handler(request: Request, exc: LichessAuthError):
 
 @app.exception_handler(LichessUnavailableError)
 @app.exception_handler(EngineError)
+@app.exception_handler(VectorStoreError)
 async def unavailable_handler(request: Request, exc: Exception):
     return JSONResponse(status_code=503, content={"detail": str(exc)})
 

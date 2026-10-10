@@ -23,3 +23,7 @@ class LichessRateLimitError(ExternalServiceError):
 
 class EngineError(ExternalServiceError):
     """Stockfish est indisponible ou a planté."""
+
+
+class VectorStoreError(ExternalServiceError):
+    """Milvus est injoignable ou la collection n'existe pas."""

@@ -1,7 +1,7 @@
 import chess
 import pytest
 from fastapi.testclient import TestClient
-from app.api.deps import get_lichess, get_stockfish
+from app.api.deps import get_lichess, get_rag_graph, get_stockfish
 from app.core.errors import LichessRateLimitError
 from app.main import app
 from app.schemas import Evaluation, Opening, Score, TheoryMove
@@ -103,3 +103,37 @@ def test_evaluate(client):
 
 def test_evaluate_rejects_bad_depth(client):
     assert client.get(f"/api/v1/evaluate/{chess.STARTING_FEN}?depth=99").status_code == 422
+
+
+class FakeGraph:
+    async def ainvoke(self, state):
+        from app.rag.catalog import OpeningCatalog
+
+        return {
+            "detected": OpeningCatalog.load().get("espagnole"),
+            "widened": False,
+            "results": [
+                {"score": 0.81, "opening_slug": "espagnole", "opening_name": "Partie espagnole", "eco": "C60",
+                 "fen": "", "section": "Histoire", "source": "wikipedia_fr", "lang": "fr",
+                 "url": "https://fr.wikipedia.org/wiki/Partie_espagnole", "text": "Ruy López de Segura..."}
+            ],
+            "context": "[1] Partie espagnole (C60) — Histoire",
+        }
+
+
+def test_vector_search(client):
+    app.dependency_overrides[get_rag_graph] = lambda: FakeGraph()
+    body = client.get("/api/v1/vector-search", params={"query": "histoire de l'espagnole"}).json()
+    assert body["detected_opening"]["slug"] == "espagnole"
+    assert body["filtered_by_opening"] is True
+    assert body["results"][0]["source"] == "wikipedia_fr"
+
+
+def test_vector_search_unavailable_returns_503(client):
+    response = client.get("/api/v1/vector-search", params={"query": "espagnole"})
+    assert response.status_code == 503
+
+
+def test_vector_search_requires_query(client):
+    app.dependency_overrides[get_rag_graph] = lambda: FakeGraph()
+    assert client.get("/api/v1/vector-search").status_code == 422
