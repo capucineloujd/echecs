@@ -2,8 +2,12 @@ services:
   backend:
     build: ./backend
     container_name: echecs-backend
+    env_file: .env
+    environment:
+      BACKEND_PORT: ${BACKEND_PORT:-8000}
     ports:
-      - "8000:8000"
+      # port machine (configurable dans .env) : port conteneur
+      - "${BACKEND_HOST_PORT:-8000}:${BACKEND_PORT:-8000}"
     restart: unless-stopped
 
   # Services à venir :

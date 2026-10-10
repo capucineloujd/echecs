@@ -1,13 +1,13 @@
 from fastapi import FastAPI
 
-app = FastAPI(title="Chess Opening Coach API")
+from app.api.v1 import health
+from app.config import settings
+
+app = FastAPI(title=settings.app_name)
+
+app.include_router(health.router, prefix=settings.api_v1_prefix)
 
 
 @app.get("/")
 def hello():
     return {"message": "Hello World"}
-
-
-@app.get("/health")
-def health():
-    return {"status": "ok"}
