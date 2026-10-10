@@ -1,8 +1,6 @@
-# Coach d'ouvertures d'échecs — POC FFE
+# Coach d'ouvertures d'échecs 
 
-Agent IA d'entraînement aux ouvertures pour les jeunes espoirs de la FFE.
-L'agent guide le joueur à partir de la position courante (FEN) en combinant :
-
+L'agent guide le joueur à partir de la position courante en combinant :
 - la théorie des ouvertures (API Lichess Opening Explorer) ;
 - le contexte historique (Wikibooks Chess Opening Theory, indexé dans Milvus) ;
 - des vidéos explicatives (YouTube Data API) ;
@@ -22,11 +20,11 @@ L'agent guide le joueur à partir de la position courante (FEN) en combinant :
 
 ```
 .
-├── backend/            API FastAPI (agent LangGraph à venir)
+├── backend/            API FastAPI (agent LangGraph)
 │   ├── app/
 │   │   ├── main.py         point d'entrée FastAPI
 │   │   ├── config.py       configuration par variables d'environnement
-│   │   └── api/v1/         routes versionnées (healthcheck…)
+│   │   └── api/v1/         routes versionnées (healthcheck...)
 │   ├── requirements.txt    dépendances aux versions figées
 │   └── Dockerfile          Python 3.12.15 figé
 ├── frontend/           Application Angular (à venir)
@@ -46,12 +44,10 @@ docker compose up --build
 
 Puis ouvrir :
 
-- http://localhost:8000 → `{"message": "Hello World"}`
-- http://localhost:8000/api/v1/healthcheck → `{"status": "ok", ...}`
-- http://localhost:8000/docs → documentation Swagger
+- http://localhost:8000 --> `{"message": "Hello World"}`
+- http://localhost:8000/api/v1/healthcheck --> `{"status": "ok", ...}`
+- http://localhost:8000/docs --> documentation Swagger
 
-`docker compose ps` affiche l'état `healthy` du conteneur (le Dockerfile
-interroge `/api/v1/healthcheck` toutes les 30 s).
 
 ## Configuration
 
@@ -73,15 +69,4 @@ voir `.env.example`).
 | MongoDB | 27017 | à venir |
 | Milvus | 19530 | à venir |
 
-En cas de conflit (port déjà utilisé sur la machine), modifier `BACKEND_HOST_PORT`
-dans `.env`. Pour vérifier qu'un port est libre : `lsof -i :8000`.
-Sur macOS, éviter 5000 et 7000 (utilisés par AirPlay).
-
 Arrêt : `docker compose down`
-
-## Avancement
-
-- [x] Étape 1 — Structure du projet, dépôt Git, service FastAPI « Hello World »
-- [ ] Frontend Angular avec échiquier interactif
-- [ ] MongoDB et Milvus dans le compose
-- [ ] Agent LangGraph (Lichess, Stockfish, RAG, YouTube)
