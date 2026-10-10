@@ -59,12 +59,21 @@ Prérequis : Docker et Docker Compose.
    ```
 
 3. Au premier lancement, indexer les articles dans Milvus (télécharge le
-   modèle d'embedding, ~1,2 Go, puis le garde en cache dans un volume Docker) :
+   modèle d'embedding, ~1,2 Go, puis le garde en cache dans un volume Docker).
+   L'API est arrêtée pendant l'ingestion : elle garde aussi le modèle en
+   mémoire, et deux copies simultanées saturent la mémoire de Docker.
 
    ```bash
-   docker compose run --rm backend python -m scripts.ingest
-   docker compose restart backend
+   docker compose stop backend
+   docker compose run --rm backend python -m scripts.ingest   # ~10 min sur CPU
+   docker compose up -d backend
    ```
+
+4. Attendre que l'API soit prête (chargement du modèle, ~20 s) : la colonne
+   STATUS de `docker compose ps` doit afficher `healthy` pour `echecs-backend`.
+
+Mémoire : prévoir au moins 12 Go pour Docker (Docker Desktop → Settings →
+Resources → Memory).
 
 Puis ouvrir :
 
