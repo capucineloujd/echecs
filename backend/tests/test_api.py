@@ -1,7 +1,6 @@
 import chess
 import pytest
 from fastapi.testclient import TestClient
-
 from app.api.deps import get_lichess, get_stockfish
 from app.core.errors import LichessRateLimitError
 from app.main import app
@@ -9,7 +8,6 @@ from app.schemas import Evaluation, Opening, Score, TheoryMove
 from app.services.lichess import ExplorerResult
 
 E4_FEN = "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1"
-
 
 class FakeLichess:
     def __init__(self, result=None, error=None):

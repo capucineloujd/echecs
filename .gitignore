@@ -4,15 +4,15 @@ __pycache__/
 .venv/
 venv/
 
-# Node / Angular
+# Node/ Angular
 node_modules/
 dist/
 .angular/
 
-# Environnement
+# Env
 .env
 
-# OS / IDE
+
 .DS_Store
 .idea/
 .vscode/

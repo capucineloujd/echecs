@@ -1,16 +1,15 @@
 import asyncio
 import logging
 import time
-
 import chess
 import httpx
-
 from app.config import Settings
 from app.core.chess_utils import uci_to_san
 from app.core.errors import LichessAuthError, LichessRateLimitError, LichessUnavailableError
 from app.schemas import Opening, TheoryMove
 
 logger = logging.getLogger(__name__)
+
 
 
 class ExplorerResult:
@@ -21,13 +20,7 @@ class ExplorerResult:
 
 
 class LichessExplorerService:
-    """Client de l'Opening Explorer Lichess.
-
-    Respecte les consignes d'usage de Lichess :
-    - une seule requête à la fois (verrou) ;
-    - après un 429, plus aucune requête pendant au moins une minute ;
-    - cache en mémoire pour ne pas redemander une position déjà vue.
-    """
+    """Client de l'Opening Explorer Lichess."""
 
     def __init__(self, settings: Settings, client: httpx.AsyncClient | None = None):
         self._settings = settings

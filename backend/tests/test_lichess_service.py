@@ -2,7 +2,6 @@ import chess
 import httpx
 import pytest
 import respx
-
 from app.config import Settings
 from app.core.errors import LichessAuthError, LichessRateLimitError, LichessUnavailableError
 from app.services.lichess import LichessExplorerService
@@ -29,10 +28,10 @@ def board():
     return b
 
 
+
 @pytest.fixture
 def service():
     return LichessExplorerService(Settings(lichess_token="test", lichess_rate_limit_cooldown_seconds=60))
-
 
 @respx.mock
 async def test_parses_moves_and_drops_illegal(service, board):
@@ -47,6 +46,8 @@ async def test_parses_moves_and_drops_illegal(service, board):
     assert route.calls[0].request.headers["Authorization"] == "Bearer test"
 
 
+
+
 @respx.mock
 async def test_uses_cache(service, board):
     route = respx.get(f"{URL}/masters").mock(return_value=httpx.Response(200, json=E4_RESPONSE))
@@ -55,7 +56,6 @@ async def test_uses_cache(service, board):
     await service.get_theory_moves(board)
 
     assert route.call_count == 1
-
 
 @respx.mock
 async def test_rate_limit_blocks_following_requests(service, board):

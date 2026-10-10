@@ -1,8 +1,6 @@
 import logging
 from typing import Literal
-
 from fastapi import APIRouter, Depends, Query
-
 from app.api.deps import get_lichess, get_stockfish
 from app.config import settings
 from app.core.chess_utils import parse_fen
@@ -11,12 +9,13 @@ from app.schemas import MovesResponse
 from app.services.lichess import LichessExplorerService
 from app.services.stockfish import StockfishService
 
+
 logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["moves"])
 
 
-# {fen:path} : une FEN contient des "/", qu'un paramètre classique refuserait
+# {fen:path}: une FEN contient des "/", qu'un paramètre classique refuserait
 @router.get("/moves/{fen:path}", response_model=MovesResponse)
 async def get_moves(
     fen: str,
@@ -24,7 +23,7 @@ async def get_moves(
     lichess: LichessExplorerService = Depends(get_lichess),
     stockfish: StockfishService = Depends(get_stockfish),
 ):
-    """Coups théoriques depuis Lichess. Hors théorie (ou Lichess indisponible) : Stockfish prend le relais."""
+    """Coups théoriques depuis Lichess. Hors théorie (ou Lichess indisponible) :Stockfish prend le relais."""
     board = parse_fen(fen)
     database = database or settings.lichess_database
 

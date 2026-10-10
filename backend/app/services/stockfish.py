@@ -1,9 +1,7 @@
 import asyncio
 import logging
-
 import chess
 import chess.engine
-
 from app.config import Settings
 from app.core.errors import EngineError
 from app.schemas import EngineLine, Evaluation, Score
@@ -12,11 +10,7 @@ logger = logging.getLogger(__name__)
 
 
 class StockfishService:
-    """Garde un processus Stockfish ouvert et sérialise les analyses.
-
-    Un seul moteur est partagé par l'API : le verrou évite que deux requêtes
-    l'interrogent en même temps. S'il plante, il est relancé à la requête suivante.
-    """
+    """Garde un processus Stockfish ouvert et sérialise les analyses"""
 
     def __init__(self, settings: Settings):
         self._settings = settings

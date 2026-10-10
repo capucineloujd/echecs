@@ -1,6 +1,5 @@
 import chess
 import pytest
-
 from app.core.chess_utils import parse_fen, uci_to_san
 from app.core.errors import InvalidFenError
 
@@ -27,6 +26,7 @@ def test_parse_lichess_url_style_fen():
 def test_parse_invalid_fen(fen):
     with pytest.raises(InvalidFenError):
         parse_fen(fen)
+
 
 
 def test_uci_to_san():

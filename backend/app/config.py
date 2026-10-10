@@ -1,8 +1,6 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-
 class Settings(BaseSettings):
-    """Configuration lue depuis les variables d'environnement (ou le fichier .env)."""
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
@@ -11,7 +9,7 @@ class Settings(BaseSettings):
     api_v1_prefix: str = "/api/v1"
     backend_port: int = 8000
 
-    # --- Lichess Opening Explorer ---
+    #Lichess Opening Explorer 
     lichess_token: str = ""
     lichess_explorer_url: str = "https://explorer.lichess.ovh"
     # "masters" (parties de maîtres OTB) ou "lichess" (parties en ligne)
@@ -27,7 +25,7 @@ class Settings(BaseSettings):
     # En dessous de ce nombre de parties, on considère qu'on est sorti de la théorie
     theory_min_games: int = 10
 
-    # --- Stockfish ---
+    # Stockfish 
     stockfish_path: str = "/usr/games/stockfish"
     stockfish_depth: int = 18
     stockfish_time_limit_seconds: float = 2.0

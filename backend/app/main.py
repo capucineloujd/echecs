@@ -1,9 +1,7 @@
 import logging
 from contextlib import asynccontextmanager
-
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
-
 from app.api.v1 import evaluate, health, moves
 from app.config import settings
 from app.core.errors import (
@@ -16,6 +14,7 @@ from app.core.errors import (
 from app.services.lichess import LichessExplorerService
 from app.services.stockfish import StockfishService
 
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -27,7 +26,7 @@ async def lifespan(app: FastAPI):
     try:
         await app.state.stockfish.start()
     except EngineError as exc:
-        # L'API démarre quand même : le moteur sera relancé à la première requête
+        # L'API démarre quand même : le moteur sera relancé à la 1ere requête
         logger.error("%s", exc)
     yield
     await app.state.stockfish.stop()
