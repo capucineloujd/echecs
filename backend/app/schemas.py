@@ -82,3 +82,32 @@ class VectorSearchResponse(BaseModel):
     filtered_by_opening: bool = Field(description="La recherche a été restreinte à cette ouverture")
     results: list[Passage]
     context: str = Field(description="Passages formatés, prêts pour un prompt LLM")
+    videos: "VideosResponse | None" = Field(None, description="Vidéos de l'ouverture détectée")
+
+
+class Video(BaseModel):
+    id: str
+    title: str
+    channel: str
+    channel_id: str
+    published_at: str
+    duration_seconds: int
+    duration: str
+    views: int
+    likes: int | None = None
+    language: str
+    thumbnail_url: str | None = None
+    watch_url: str
+    embed_url: str = Field(description="URL à mettre dans une iframe pour lire la vidéo dans l'application")
+    score: float
+
+
+class VideosResponse(BaseModel):
+    opening: str
+    opening_slug: str | None = None
+    status: Literal["ok", "no_results", "quota_exceeded", "unavailable"]
+    message: str | None = None
+    videos: list[Video] = []
+    fallback_search_url: str = Field(description="Recherche YouTube à proposer si aucune vidéo n'est retenue")
+    cached: bool = False
+    quota_units_used: int = 0

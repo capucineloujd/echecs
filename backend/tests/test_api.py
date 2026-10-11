@@ -1,7 +1,7 @@
 import chess
 import pytest
 from fastapi.testclient import TestClient
-from app.api.deps import get_lichess, get_rag_graph, get_stockfish
+from app.api.deps import get_lichess, get_rag_graph, get_stockfish, get_youtube
 from app.core.errors import LichessRateLimitError
 from app.main import app
 from app.schemas import Evaluation, Opening, Score, TheoryMove
@@ -137,3 +137,20 @@ def test_vector_search_unavailable_returns_503(client):
 def test_vector_search_requires_query(client):
     app.dependency_overrides[get_rag_graph] = lambda: FakeGraph()
     assert client.get("/api/v1/vector-search").status_code == 422
+
+
+class FakeYouTube:
+    async def find_videos(self, opening):
+        from app.schemas import VideosResponse
+
+        return VideosResponse(opening=opening, status="no_results", message="Aucune vidéo",
+                              fallback_search_url="https://www.youtube.com/results?search_query=x")
+
+
+def test_videos_endpoint(client):
+    app.dependency_overrides[get_youtube] = lambda: FakeYouTube()
+    response = client.get("/api/v1/videos/Défense sicilienne")
+    assert response.status_code == 200
+    body = response.json()
+    assert body["status"] == "no_results" and body["videos"] == []
+    assert body["opening"] == "Défense sicilienne"

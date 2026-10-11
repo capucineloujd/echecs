@@ -17,6 +17,11 @@ class OpeningInfo:
     moves: str
     fen: str
     aliases: tuple[str, ...]
+    name_en: str = ""
+
+    @property
+    def search_terms(self) -> tuple[str, ...]:
+        return tuple(t for t in (self.name, self.slug, self.name_en, *self.aliases) if t)
 
 
 def normalize(text: str) -> str:
@@ -30,7 +35,7 @@ class OpeningCatalog:
         self.openings = {o.slug: o for o in openings}
         # Alias les plus longs d'abord : "gambit dame" doit gagner sur "dame"
         self._aliases = sorted(
-            ((normalize(alias), o) for o in openings for alias in (o.name, o.slug, *o.aliases)),
+            ((normalize(alias), o) for o in openings for alias in o.search_terms),
             key=lambda pair: len(pair[0]),
             reverse=True,
         )
@@ -42,8 +47,19 @@ class OpeningCatalog:
             board = chess.Board()
             for san in o["moves"].split():
                 board.push_san(san)
-            openings.append(OpeningInfo(o["slug"], o["name"], o["eco"], o["moves"], board.fen(), tuple(o["aliases"])))
+            openings.append(
+                OpeningInfo(
+                    o["slug"], o["name"], o["eco"], o["moves"], board.fen(), tuple(o["aliases"]), o.get("name_en", "")
+                )
+            )
         return cls(openings)
+
+    def exact(self, slug_or_name: str) -> OpeningInfo | None:
+        """Correspondance exacte (slug, nom ou alias), sans recherche dans une phrase."""
+        if slug_or_name in self.openings:
+            return self.openings[slug_or_name]
+        wanted = normalize(slug_or_name)
+        return next((o for alias, o in self._aliases if alias == wanted), None)
 
     def get(self, slug_or_name: str) -> OpeningInfo | None:
         return self.openings.get(slug_or_name) or self.detect(slug_or_name)

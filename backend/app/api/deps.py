@@ -16,3 +16,7 @@ def get_rag_graph(request: Request):
     if graph is None:
         raise VectorStoreError("Recherche vectorielle indisponible (modèle ou Milvus non initialisé)")
     return graph
+
+
+def get_youtube(request: Request):
+    return request.app.state.youtube

@@ -28,7 +28,7 @@ L'agent guide le joueur à partir de la position courante en combinant :
 │   │   ├── api/v1/         routes versionnées (healthcheck, moves, evaluate, vector-search)
 │   │   ├── core/           validation FEN (python-chess), erreurs métier
 │   │   ├── rag/            découpage, catalogue des ouvertures, graphe LangGraph
-│   │   └── services/       Lichess, Stockfish, embeddings, Milvus
+│   │   └── services/       Lichess, Stockfish, embeddings, Milvus, YouTube, cache MongoDB
 │   ├── scripts/            fetch_wikichess.py (collecte), ingest.py (indexation Milvus)
 │   ├── data/               catalogue des ouvertures + articles bruts (data/raw)
 │   ├── tests/              tests pytest (services externes simulés, Stockfish réel)
@@ -49,7 +49,10 @@ Prérequis : Docker et Docker Compose.
    (voir [Configuration](#configuration) pour les autres variables) :
 
    ```bash
-   echo "LICHESS_TOKEN=lip_xxxxxxxx" > .env
+   cat > .env <<EOF
+   LICHESS_TOKEN=lip_xxxxxxxx
+   YOUTUBE_API_KEY=AIza...
+   EOF
    ```
 
 2. Lancer :
@@ -99,7 +102,8 @@ curl "localhost:8000/api/v1/moves/rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR_
 curl "localhost:8000/api/v1/evaluate/rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR_b_KQkq_-_0_1"
 ```
 
-| `GET /api/v1/vector-search?query=...&opening=...&top_k=5` | Recherche vectorielle dans les articles d'ouvertures (Milvus). Renvoie les passages les plus pertinents avec leur source, et un champ `context` prêt pour un LLM. |
+| `GET /api/v1/vector-search?query=...&opening=...&top_k=5&videos=true` | Recherche vectorielle dans les articles d'ouvertures (Milvus). Renvoie les passages les plus pertinents avec leur source, un champ `context` prêt pour un LLM et, si une ouverture est reconnue, des vidéos YouTube. |
+| `GET /api/v1/videos/{opening}` | Vidéos YouTube explicatives pour une ouverture (slug `espagnole`, nom `Défense Caro-Kann` ou nom de variante Lichess `Sicilian Defense: Najdorf Variation`). |
 
 Codes d'erreur : `422` FEN invalide · `502` token Lichess absent/invalide ·
 `503` Lichess ou Stockfish indisponible (avec `Retry-After` en cas de limite de requêtes).
@@ -185,6 +189,8 @@ detect_opening ──► retrieve ──┬──► format_results ──► EN
                       └─ widen_search  (si le filtre ne trouve rien de pertinent)
 ```
 
+(Branche vidéos en parallèle : voir [Vidéos YouTube](#vidéos-youtube).)
+
 - `detect_opening` reconnaît l'ouverture citée dans la question (« la
   Ruy Lopez », « défense caro kann »…) et restreint la recherche à celle-ci ;
 - `retrieve` vectorise la question et interroge Milvus ;
@@ -196,6 +202,63 @@ Exemple :
 
 ```bash
 curl -G localhost:8000/api/v1/vector-search --data-urlencode "query=Quelle est l'histoire de la partie espagnole ?"
+```
+
+## Vidéos YouTube
+
+### Clé API
+
+Google Cloud Console → créer un projet → activer **YouTube Data API v3** →
+*Credentials* → *Create API key* (la restreindre à YouTube Data API v3) →
+`YOUTUBE_API_KEY` dans `.env`. Sans clé, l'endpoint répond `status: "unavailable"`.
+
+### Recherche et filtrage
+
+1. Requête en français (`<nom> échecs ouverture explication`), puis en anglais
+   (`<nom anglais> chess opening explained tutorial`) seulement s'il manque
+   des vidéos. `safeSearch=strict` (public de jeunes joueurs).
+2. Filtres : vidéo intégrable, pas de live, durée entre 4 et 60 min (exclut
+   les Shorts), au moins 5 000 vues, **titre citant l'ouverture**.
+3. Classement : popularité (log des vues), ratio de likes, bonus pour le
+   français, bonus pour les chaînes favorites (`YOUTUBE_PREFERRED_CHANNELS`),
+   bonus pour les titres citant la variante précise ; au plus 2 vidéos par
+   chaîne.
+
+Chaque vidéo est renvoyée avec ses métadonnées (chaîne, durée, vues, likes,
+langue, miniature), son lien `watch_url` et une `embed_url`
+(`youtube-nocookie.com/embed/...`) pour la lire directement dans l'application.
+
+### Quotas
+
+Le quota gratuit est de 10 000 unités/jour ; une recherche coûte 100 unités,
+le détail des vidéos 1 unité. Pour l'économiser :
+
+- résultats en **cache MongoDB 7 jours** par ouverture (1 jour si aucune vidéo
+  n'est trouvée) : le cache survit aux redémarrages ;
+- la recherche anglaise n'est lancée que si la française ne suffit pas
+  (101 unités au lieu de 202) ;
+- dans le graphe, aucune recherche vidéo sans ouverture identifiée ;
+- si YouTube renvoie `quotaExceeded`, plus aucun appel jusqu'à la remise à
+  zéro (minuit, heure du Pacifique).
+
+### Cas dégradés
+
+L'endpoint répond toujours `200` ; le champ `status` vaut `ok`, `no_results`,
+`quota_exceeded` ou `unavailable`, avec un `message` et un
+`fallback_search_url` (recherche YouTube toute prête) à proposer à
+l'utilisateur.
+
+### Intégration LangGraph
+
+Le nœud `find_videos` tourne **en parallèle** de la recherche Milvus, juste
+après `detect_opening` :
+
+```
+                  ┌──► find_videos ──────────────────────────► END
+    detect_opening┤
+                  └──► retrieve ──┬──► format_results ──► END
+                          ▲       │
+                          └─ widen_search
 ```
 
 ## Tests
@@ -234,6 +297,14 @@ par défaut, sauf `LICHESS_TOKEN`.
 | `RAG_TOP_K` | `5` | Nombre de passages renvoyés par défaut |
 | `RAG_MIN_SCORE` | `0.35` | Similarité cosinus minimale d'un passage |
 | `CHUNK_MAX_CHARS` | `1200` | Taille maximale d'un passage |
+| `MONGO_URI` | `mongodb://mongodb:27017` | Adresse de MongoDB (réseau Docker) |
+| `MONGO_HOST_PORT` | `27017` | Port MongoDB exposé sur la machine hôte |
+| `YOUTUBE_API_KEY` | *(vide)* | Clé YouTube Data API v3 (obligatoire pour les vidéos) |
+| `YOUTUBE_MAX_VIDEOS` | `5` | Nombre de vidéos renvoyées |
+| `YOUTUBE_MIN_VIEWS` | `5000` | Vues minimales |
+| `YOUTUBE_MIN_DURATION_SECONDS` / `YOUTUBE_MAX_DURATION_SECONDS` | `240` / `3600` | Durée acceptée |
+| `YOUTUBE_CACHE_TTL_DAYS` | `7` | Durée du cache des résultats |
+| `YOUTUBE_PREFERRED_CHANNELS` | *(vide)* | Identifiants de chaînes favorisées, séparés par des virgules |
 
 ### Ports
 
@@ -241,7 +312,7 @@ par défaut, sauf `LICHESS_TOKEN`.
 |---|---|---|
 | Backend FastAPI | 8000 | actif |
 | Frontend Angular | 4200 | à venir |
-| MongoDB | 27017 | à venir |
+| MongoDB | 27017 | actif |
 | Milvus | 19530 | actif |
 
 etcd et MinIO (stockage interne de Milvus) ne sont pas exposés sur la machine :

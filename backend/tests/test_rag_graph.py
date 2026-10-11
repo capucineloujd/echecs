@@ -88,3 +88,35 @@ async def test_graph_explicit_opening_param(catalog):
     store = FakeStore({"francaise": [hit("francaise", 0.7, "Winawer")]})
     await run(build_rag_graph(FakeEmbedder(), store, catalog), "plans typiques", opening="française")
     assert store.calls == ["francaise"]
+
+
+class FakeYouTube:
+    def __init__(self):
+        self.calls = []
+
+    async def find_videos(self, opening):
+        from app.schemas import VideosResponse
+
+        self.calls.append(opening)
+        return VideosResponse(opening=opening, status="ok", fallback_search_url="https://x")
+
+
+async def test_graph_proposes_videos_for_detected_opening(catalog):
+    youtube = FakeYouTube()
+    store = FakeStore({"espagnole": [hit("espagnole", 0.8, "Ruy López")]})
+    state = await run(build_rag_graph(FakeEmbedder(), store, catalog, youtube), "plans de l'espagnole")
+    assert youtube.calls == ["espagnole"]
+    assert state["videos"].status == "ok"
+    assert state["results"][0]["text"] == "Ruy López"  # la branche Milvus a bien tourné aussi
+
+
+async def test_graph_no_videos_without_detected_opening(catalog):
+    youtube = FakeYouTube()
+    state = await run(build_rag_graph(FakeEmbedder(), FakeStore({}), catalog, youtube), "question vague")
+    assert youtube.calls == [] and state["videos"] is None
+
+
+async def test_graph_videos_can_be_disabled(catalog):
+    youtube = FakeYouTube()
+    await run(build_rag_graph(FakeEmbedder(), FakeStore({}), catalog, youtube), "espagnole", include_videos=False)
+    assert youtube.calls == []

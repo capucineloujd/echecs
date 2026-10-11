@@ -54,5 +54,20 @@ class Settings(BaseSettings):
     rag_min_score: float = 0.35
     chunk_max_chars: int = 1200
 
+    # MongoDB (cache des appels aux API externes)
+    mongo_uri: str = "mongodb://mongodb:27017"
+    mongo_db: str = "echecs"
+
+    # YouTube Data API v3
+    youtube_api_key: str = ""
+    youtube_timeout_seconds: float = 10.0
+    youtube_max_videos: int = 5
+    youtube_min_views: int = 5000
+    youtube_min_duration_seconds: int = 240
+    youtube_max_duration_seconds: int = 3600
+    youtube_cache_ttl_days: int = 7
+    # Chaînes favorisées dans le classement (identifiants séparés par des virgules)
+    youtube_preferred_channels: str = ""
+
 
 settings = Settings()

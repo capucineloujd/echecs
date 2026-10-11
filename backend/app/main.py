@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 import asyncio
-from app.api.v1 import evaluate, health, moves, vector_search
+from app.api.v1 import evaluate, health, moves, vector_search, videos
 from app.config import settings
 from app.core.errors import (
     EngineError,
@@ -16,7 +16,9 @@ from app.core.errors import (
 from app.services.lichess import LichessExplorerService
 from app.rag.catalog import OpeningCatalog
 from app.rag.graph import build_rag_graph
+from app.services.cache import MongoCache
 from app.services.stockfish import StockfishService
+from app.services.youtube import YouTubeService
 from app.services.vector_store import VectorStoreService
 
 
@@ -33,6 +35,9 @@ async def lifespan(app: FastAPI):
     except EngineError as exc:
         # L'API démarre quand même : le moteur sera relancé à la 1ere requête
         logger.error("%s", exc)
+    app.state.cache = MongoCache(settings.mongo_uri, settings.mongo_db)
+    catalog = OpeningCatalog.load()
+    app.state.youtube = YouTubeService(settings, app.state.cache, catalog)
     app.state.vector_store = VectorStoreService(settings.milvus_uri, settings.milvus_collection)
     try:
         # Import tardif : torch est long à charger, inutile pour /moves et /evaluate
@@ -45,12 +50,13 @@ async def lifespan(app: FastAPI):
             settings.embedding_threads,
             settings.embedding_query_instruction,
         )
-        app.state.rag_graph = build_rag_graph(embedder, app.state.vector_store, OpeningCatalog.load())
+        app.state.rag_graph = build_rag_graph(embedder, app.state.vector_store, catalog, app.state.youtube)
     except Exception as exc:
         # L'API reste utilisable sans RAG : /vector-search renverra 503
         logger.error("RAG désactivé : %s", exc)
     yield
     app.state.vector_store.close()
+    await app.state.cache.close()
     await app.state.stockfish.stop()
     await app.state.lichess.close()
 
@@ -61,6 +67,7 @@ app.include_router(health.router, prefix=settings.api_v1_prefix)
 app.include_router(moves.router, prefix=settings.api_v1_prefix)
 app.include_router(evaluate.router, prefix=settings.api_v1_prefix)
 app.include_router(vector_search.router, prefix=settings.api_v1_prefix)
+app.include_router(videos.router, prefix=settings.api_v1_prefix)
 
 
 @app.exception_handler(InvalidFenError)
