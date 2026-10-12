@@ -108,6 +108,6 @@ class VideosResponse(BaseModel):
     status: Literal["ok", "no_results", "quota_exceeded", "unavailable"]
     message: str | None = None
     videos: list[Video] = []
-    fallback_search_url: str = Field(description="Recherche YouTube à proposer si aucune vidéo n'est retenue")
+    fallback_search_url: str = Field(description="Recherche YouTube à proposer si aucune vidéo n'est retenu")
     cached: bool = False
     quota_units_used: int = 0

@@ -20,8 +20,6 @@ from app.services.cache import MongoCache
 from app.services.stockfish import StockfishService
 from app.services.youtube import YouTubeService
 from app.services.vector_store import VectorStoreService
-
-
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -33,7 +31,7 @@ async def lifespan(app: FastAPI):
     try:
         await app.state.stockfish.start()
     except EngineError as exc:
-        # L'API démarre quand même : le moteur sera relancé à la 1ere requête
+        # L'API démarre quand mm : le moteur sera relancé à la 1ere requête
         logger.error("%s", exc)
     app.state.cache = MongoCache(settings.mongo_uri, settings.mongo_db)
     app.state.catalog = catalog = OpeningCatalog.load()
@@ -74,6 +72,8 @@ app.include_router(videos.router, prefix=settings.api_v1_prefix)
 @app.exception_handler(InvalidFenError)
 async def invalid_fen_handler(request: Request, exc: InvalidFenError):
     return JSONResponse(status_code=422, content={"detail": str(exc)})
+
+
 
 
 @app.exception_handler(LichessRateLimitError)

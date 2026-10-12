@@ -19,14 +19,13 @@ def test_parse_lichess_url_style_fen():
     [
         "pas une fen",
         "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP w KQkq - 0 1",  # 7 rangées
-        "8/8/8/8/8/8/8/8 w - - 0 1",  # pas de rois
+        "8/8/8/8/8/8/8/8 w - - 0 1",  #pas de rois
         "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR b KQkq - 0 1 x",
     ],
 )
 def test_parse_invalid_fen(fen):
     with pytest.raises(InvalidFenError):
         parse_fen(fen)
-
 
 
 def test_uci_to_san():

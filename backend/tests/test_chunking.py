@@ -17,7 +17,6 @@ Un livre.
 
  Portail des échecs"""
 
-
 def test_sections_keep_hierarchy_and_skip_noise():
     names = [name for name, _ in split_sections(ARTICLE)]
     assert names == ["Introduction", "Histoire", "Variantes > La variante Winawer"]

@@ -33,7 +33,7 @@ class Settings(BaseSettings):
     stockfish_threads: int = 2
     stockfish_hash_mb: int = 128
 
-    # Milvus (nom du service dans le réseau Docker)
+    # Milvus 
     milvus_uri: str = "http://milvus:19530"
     milvus_collection: str = "opening_chunks"
 
@@ -42,7 +42,7 @@ class Settings(BaseSettings):
     embedding_batch_size: int = 16
     # Threads CPU pour torch : on en laisse pour Milvus (sinon il perd son bail etcd)
     embedding_threads: int = 4
-    # Consigne ajoutée aux requêtes (recommandé par Qwen3-Embedding, pas aux documents)
+    # Consigne ajoutée aux requêtes
     embedding_query_instruction: str = (
         "Instruct: Given a chess player's question, retrieve encyclopedia passages "
         "about chess openings that answer it\nQuery: "

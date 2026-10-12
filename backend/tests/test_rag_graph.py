@@ -1,5 +1,4 @@
 import pytest
-
 from app.rag.catalog import OpeningCatalog, normalize
 from app.rag.graph import build_rag_graph
 

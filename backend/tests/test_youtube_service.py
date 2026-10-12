@@ -140,7 +140,7 @@ async def test_quota_exceeded_blocks_next_calls(catalog):
     client.error = None
     second = await svc.find_videos("italienne")
     assert second.status == "quota_exceeded"
-    assert len(client.searches) == 1  # plus aucun appel tant que le quota n'est pas remis à zéro
+    assert len(client.searches) == 1  # plus aucun appel tant que le quota n'est pas remis à 0
 
 
 async def test_network_error_is_unavailable(catalog):
@@ -161,7 +161,7 @@ async def test_opening_outside_catalog(catalog):
                                 item("sic", "The Sicilian Defense", channel="d", views=900_000),
                                 item("n3", "Comment gagner aux échecs", channel="c")]})
     result = await service(catalog, client).find_videos("Sicilian Defense: Najdorf Variation")
-    # Les vidéos sur la variante passent devant une vidéo générale bien plus vue
+    # Les vidéos sur la variante passent devant une vidéo générale bien + vue
     assert [v.id for v in result.videos][:2] == ["n1", "n2"] and "sic" in {v.id for v in result.videos}
     # La recherche porte sur la variante, la famille reste indiquée
     assert "Sicilian Defense: Najdorf Variation" in client.searches[0][1]
@@ -183,6 +183,5 @@ def test_format_duration():
 
 
 def test_quota_reset_is_next_pacific_midnight():
-    # 10/10 à 20:00 UTC = 13:00 à Los Angeles -> reset le 11/10 à 00:00 PDT = 07:00 UTC
     reset = next_quota_reset(datetime(2026, 10, 10, 20, 0, tzinfo=timezone.utc))
     assert reset == datetime(2026, 10, 11, 7, 0, tzinfo=timezone.utc)

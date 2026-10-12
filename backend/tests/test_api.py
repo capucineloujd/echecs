@@ -18,7 +18,6 @@ class FakeLichess:
             raise self.error
         return self.result
 
-
 class FakeStockfish:
     calls = 0
 
