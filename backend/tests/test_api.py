@@ -1,7 +1,7 @@
 import chess
 import pytest
 from fastapi.testclient import TestClient
-from app.api.deps import get_lichess, get_rag_graph, get_stockfish, get_youtube
+from app.api.deps import get_catalog, get_lichess, get_rag_graph, get_stockfish, get_youtube
 from app.core.errors import LichessRateLimitError
 from app.main import app
 from app.schemas import Evaluation, Opening, Score, TheoryMove
@@ -154,3 +154,14 @@ def test_videos_endpoint(client):
     body = response.json()
     assert body["status"] == "no_results" and body["videos"] == []
     assert body["opening"] == "Défense sicilienne"
+
+
+def test_openings_lists_catalog_sorted_by_eco(client):
+    from app.rag.catalog import OpeningCatalog
+
+    app.dependency_overrides[get_catalog] = OpeningCatalog.load
+    body = client.get("/api/v1/openings").json()
+    assert len(body) == 10
+    assert [o["eco"] for o in body] == sorted(o["eco"] for o in body)
+    espagnole = next(o for o in body if o["slug"] == "espagnole")
+    assert espagnole["moves"] == "e4 e5 Nf3 Nc6 Bb5" and espagnole["fen"].startswith("r1bqkbnr/pppp1ppp/2n5/1B2p3")

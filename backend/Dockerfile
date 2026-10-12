@@ -12,7 +12,7 @@ RUN apt-get update \
 
 WORKDIR /app
 
-# torch en version CPU (la version par défaut embarque CUDA : plusieurs Go inutiles)
+# torch en version CPU 
 RUN pip install --no-cache-dir --index-url https://download.pytorch.org/whl/cpu torch==2.14.1
 
 COPY requirements.txt .

@@ -1,0 +1,77 @@
+<header class="topbar">
+  <h1>♞ Coach d'ouvertures</h1>
+  <p>Entraîne-toi sur les ouvertures avec les conseils de l'agent</p>
+</header>
+
+<main class="layout">
+  <section class="board-column" aria-label="Échiquier">
+    <div class="toolbar">
+      <label>
+        <span class="sr-only">Choisir une ouverture</span>
+        <select (change)="onOpeningSelected($event)" [disabled]="coach.openings().status !== 'ok'">
+          <option value="">
+            {{ coach.openings().status === 'error' ? 'Catalogue indisponible' : 'Choisir une ouverture…' }}
+          </option>
+          @if (coach.openings(); as openings) {
+            @if (openings.status === 'ok') {
+              @for (opening of openings.data; track opening.slug) {
+                <option [value]="opening.moves">{{ opening.eco }} · {{ opening.name }}</option>
+              }
+            }
+          }
+        </select>
+      </label>
+      <label class="toggle">
+        <input type="checkbox" [checked]="coach.showEvaluation()" (change)="coach.showEvaluation.set(!coach.showEvaluation())" />
+        Évaluation Stockfish
+      </label>
+    </div>
+
+    <div class="board-wrapper">
+      @if (coach.showEvaluation()) {
+        <div class="eval-bar" [class.flipped]="game.orientation() === 'black'" aria-hidden="true">
+          <div class="eval-white" [style.height.%]="evaluation() ? whiteShare(evaluation()!.score) : 50"></div>
+        </div>
+      }
+      <app-chess-board [fen]="game.fen()" [orientation]="game.orientation()" (moved)="onBoardMove($event)" />
+    </div>
+
+    @if (coach.showEvaluation()) {
+      <p class="eval-text" aria-live="polite">
+        @switch (coach.evaluation().status) {
+          @case ('loading') { Stockfish réfléchit… }
+          @case ('error') { Évaluation indisponible. }
+          @case ('ok') {
+            <strong>{{ formatScore(evaluation()!.score) }}</strong> · {{ describeScore(evaluation()!.score) }}
+            (profondeur {{ evaluation()!.depth }})
+          }
+        }
+      </p>
+    }
+
+    <div class="controls" role="group" aria-label="Navigation dans la partie">
+      <button type="button" (click)="game.first()" [disabled]="game.cursor() === 0" aria-label="Début">⏮</button>
+      <button type="button" (click)="game.previous()" [disabled]="game.cursor() === 0" aria-label="Coup précédent">◀</button>
+      <button type="button" (click)="game.next()" [disabled]="game.cursor() === game.plies().length" aria-label="Coup suivant">▶</button>
+      <button type="button" (click)="game.last()" [disabled]="game.cursor() === game.plies().length" aria-label="Fin">⏭</button>
+      <button type="button" (click)="game.flip()" aria-label="Retourner l'échiquier">⇅</button>
+      <button type="button" (click)="game.reset()" [disabled]="!game.plies().length">Nouvelle partie</button>
+    </div>
+
+    <p class="turn">
+      @if (game.gameOver(); as over) {
+        {{ over }}
+      } @else {
+        Trait aux {{ game.turn() === 'white' ? 'Blancs' : 'Noirs' }}
+      }
+    </p>
+
+    <app-move-list [plies]="game.plies()" [cursor]="game.cursor()" (select)="game.goTo($event)" />
+  </section>
+
+  <aside class="panel" aria-label="Recommandations de l'agent">
+    <app-suggestions [state]="coach.moves()" [gameOver]="game.gameOver()" (play)="onPlay($event)" (retry)="coach.retryMoves()" />
+    <app-opening-context [state]="coach.context()" [openingName]="coach.openingName()" (retry)="coach.retryContext()" />
+    <app-videos [state]="coach.videos()" [canSearch]="coach.canSearchVideos()" (search)="coach.searchVideos()" />
+  </aside>
+</main>

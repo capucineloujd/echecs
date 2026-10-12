@@ -10,7 +10,7 @@ L'agent guide le joueur à partir de la position courante en combinant :
 
 | Couche | Technologies |
 |---|---|
-| Frontend | Angular, material-chessboard (ngx-chessboard) |
+| Frontend | Angular 22, ngx-chess-board, chess.js, nginx |
 | Backend | FastAPI, LangGraph |
 | Données | MongoDB, Milvus |
 | Moteur | Stockfish |
@@ -25,7 +25,7 @@ L'agent guide le joueur à partir de la position courante en combinant :
 │   │   ├── main.py         point d'entrée FastAPI
 │   │   ├── config.py       configuration par variables d'environnement
 │   │   ├── schemas.py      modèles de réponse (Pydantic)
-│   │   ├── api/v1/         routes versionnées (healthcheck, moves, evaluate, vector-search)
+│   │   ├── api/v1/         routes versionnées (healthcheck, moves, evaluate, openings, vector-search, videos)
 │   │   ├── core/           validation FEN (python-chess), erreurs métier
 │   │   ├── rag/            découpage, catalogue des ouvertures, graphe LangGraph
 │   │   └── services/       Lichess, Stockfish, embeddings, Milvus, YouTube, cache MongoDB
@@ -35,7 +35,14 @@ L'agent guide le joueur à partir de la position courante en combinant :
 │   ├── requirements.txt    dépendances aux versions figées
 │   ├── requirements-dev.txt
 │   └── Dockerfile          Python 3.12.15 + Stockfish 15.1 figés
-├── frontend/           Application Angular (à venir)
+├── frontend/           Application Angular
+│   ├── src/app/
+│   │   ├── core/           services HTTP, état de la partie (GameStore), recommandations (CoachStore)
+│   │   ├── board/          enveloppe de ngx-chess-board
+│   │   └── panel/          coups suggérés, fiche de l'ouverture, vidéos, liste des coups
+│   ├── nginx/              config nginx (fichiers statiques + proxy /api vers le backend)
+│   ├── proxy.conf.json     proxy /api pour `npm start` en développement
+│   └── Dockerfile          build Node 24.18.1, service nginx 1.30.0
 ├── docker-compose.yml
 ├── .env                configuration locale (non versionnée, à créer)
 └── README.md
@@ -80,6 +87,7 @@ Resources → Memory).
 
 Puis ouvrir :
 
+- http://localhost:4200 --> l'interface (échiquier + recommandations de l'agent)
 - http://localhost:8000 --> `{"message": "Hello World"}`
 - http://localhost:8000/api/v1/healthcheck --> `{"status": "ok", ...}`
 - http://localhost:8000/docs --> documentation Swagger
@@ -94,6 +102,9 @@ La FEN se passe directement dans l'URL. Les espaces peuvent être encodés
 | `GET /api/v1/healthcheck` | État du service |
 | `GET /api/v1/moves/{fen}?database=masters\|lichess` | Coups théoriques Lichess (statistiques, ouverture ECO). Hors théorie, ou si Lichess est indisponible, la réponse contient l'évaluation Stockfish (`source: "stockfish"`). |
 | `GET /api/v1/evaluate/{fen}?depth=18&multipv=3` | Évaluation Stockfish : score en centipawns (ou mat en N) du point de vue des Blancs, meilleur coup, meilleures lignes |
+| `GET /api/v1/openings` | Ouvertures du catalogue (slug, nom, ECO, coups, FEN), pour le menu de l'interface |
+| `GET /api/v1/vector-search?query=...&opening=...&top_k=5&videos=true` | Recherche vectorielle dans les articles d'ouvertures (Milvus). Renvoie les passages les plus pertinents avec leur source, un champ `context` prêt pour un LLM et, si une ouverture est reconnue, des vidéos YouTube. |
+| `GET /api/v1/videos/{opening}` | Vidéos YouTube explicatives pour une ouverture (slug `espagnole`, nom `Défense Caro-Kann` ou nom de variante Lichess `Sicilian Defense: Najdorf Variation`). |
 
 Exemple :
 
@@ -102,8 +113,6 @@ curl "localhost:8000/api/v1/moves/rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR_
 curl "localhost:8000/api/v1/evaluate/rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR_b_KQkq_-_0_1"
 ```
 
-| `GET /api/v1/vector-search?query=...&opening=...&top_k=5&videos=true` | Recherche vectorielle dans les articles d'ouvertures (Milvus). Renvoie les passages les plus pertinents avec leur source, un champ `context` prêt pour un LLM et, si une ouverture est reconnue, des vidéos YouTube. |
-| `GET /api/v1/videos/{opening}` | Vidéos YouTube explicatives pour une ouverture (slug `espagnole`, nom `Défense Caro-Kann` ou nom de variante Lichess `Sicilian Defense: Najdorf Variation`). |
 
 Codes d'erreur : `422` FEN invalide · `502` token Lichess absent/invalide ·
 `503` Lichess ou Stockfish indisponible (avec `Retry-After` en cas de limite de requêtes).
@@ -261,12 +270,81 @@ après `detect_opening` :
                           └─ widen_search
 ```
 
+## Interface Angular
+
+### Choix techniques
+
+- **Échiquier** : le paquet `ngx-chessboard` n'existe pas sur npm ; la librairie
+  s'appelle `ngx-chess-board`. Sa v3.0.0 a été publiée sans build (sources
+  TypeScript seules) et est inutilisable : on utilise la **v2.2.3**, compilée
+  pour Angular 13 mais compatible Angular 22 (format Ivy partiel). Elle importe
+  `lodash` sans le déclarer : il est ajouté aux dépendances. Les `overrides` du
+  `package.json` alignent ses peerDependencies sur la version d'Angular du projet.
+- **Angular 22** : composants standalone, signals, nouveau control flow
+  (`@if`, `@for`), sans zone.js.
+- **Même origine** : en dev, `ng serve` redirige `/api` vers `localhost:8000`
+  (`proxy.conf.json`) ; en Docker, nginx sert les fichiers et fait le proxy
+  vers `backend`. Pas de CORS à configurer.
+
+### Synchronisation échiquier / agent
+
+```
+        coup à la souris            clic sur une suggestion
+   ngx-chess-board ──► FEN ──┐      ┌── SAN
+                             ▼      ▼
+                      GameStore (chess.js) : source de vérité
+                       historique, curseur, FEN affichée
+                             │
+               ┌─────────────┴───────────────┐
+               ▼                             ▼
+        ChessBoardComponent             CoachStore
+        (setFEN si la position          debounce 250 ms + switchMap
+         affichée diffère)              ├─ /moves/{fen}       à chaque position
+                                        ├─ /evaluate/{fen}    si l'option est cochée
+                                        └─ /vector-search     à chaque changement d'ouverture
+                                             (passages + vidéos)
+```
+
+- ngx-chess-board ne donne que la FEN obtenue après un coup : `GameStore`
+  retrouve le coup légal qui y mène avec chess.js (roque, prise en passant,
+  promotion). Si aucun ne correspond, l'échiquier est remis sur la position du store.
+- `switchMap` annule la requête de la position précédente : une réponse ne peut
+  pas s'afficher sur une autre position que celle de l'échiquier.
+- Navigation ◀ ▶ (ou flèches du clavier) dans les coups joués ; jouer un autre
+  coup au milieu de la partie remplace la suite.
+
+### Optimisation des appels
+
+| Mécanisme | Effet |
+|---|---|
+| Debounce 250 ms | Plusieurs coups enchaînés (ou ◀ ▶ rapides) : un seul appel, pour la position finale |
+| Cache LRU par FEN (`RequestCache`) | Revenir sur une position déjà vue ne refait pas d'appel ; requêtes identiques partagées |
+| Annulation | Une requête qui n'a plus d'abonné est annulée ; les erreurs ne sont pas mises en cache |
+| Contexte par ouverture | `/vector-search` n'est appelé que quand le nom d'ouverture change, pas à chaque coup ; le nom reste affiché hors théorie |
+| Vidéos à la demande | Pour une ouverture hors catalogue (ex. « King's Pawn Game »), bouton « Chercher des vidéos » au lieu d'un appel automatique qui consommerait le quota YouTube |
+| Stockfish optionnel | `/evaluate` n'est appelé que si « Évaluation Stockfish » est cochée |
+
+### Chargement et erreurs
+
+Chaque panneau a son propre état (`idle`, `loading`, `ok`, `error`) : squelette
+animé pendant le chargement, message et bouton « Réessayer » en cas d'erreur.
+Les messages distinguent serveur injoignable, backend en cours de démarrage
+(502/503/504 du proxy), limite Lichess (avec le délai `Retry-After`) et timeout.
+
 ## Tests
+
+Backend :
 
 ```bash
 docker compose build backend
 docker run --rm -v "$PWD/backend:/src" echecs-backend \
   sh -c "pip install -q -r /src/requirements-dev.txt && cd /src && pytest"
+```
+
+Frontend (Node 24) :
+
+```bash
+cd frontend && npm ci && npm test -- --watch=false
 ```
 
 
@@ -281,6 +359,7 @@ par défaut, sauf `LICHESS_TOKEN`.
 | `APP_ENV` | `development` | Environnement d'exécution |
 | `BACKEND_PORT` | `8000` | Port d'écoute de FastAPI dans le conteneur |
 | `BACKEND_HOST_PORT` | `8000` | Port exposé sur la machine hôte |
+| `FRONTEND_HOST_PORT` | `4200` | Port de l'interface sur la machine hôte |
 | `LICHESS_TOKEN` | *(vide)* | Token personnel Lichess (obligatoire pour `/moves`) |
 | `LICHESS_DATABASE` | `masters` | Base par défaut : `masters` ou `lichess` |
 | `LICHESS_TIMEOUT_SECONDS` | `5` | Timeout des appels Lichess |
@@ -311,7 +390,7 @@ par défaut, sauf `LICHESS_TOKEN`.
 | Service | Port hôte | Statut |
 |---|---|---|
 | Backend FastAPI | 8000 | actif |
-| Frontend Angular | 4200 | à venir |
+| Frontend Angular (nginx) | 4200 | actif |
 | MongoDB | 27017 | actif |
 | Milvus | 19530 | actif |
 

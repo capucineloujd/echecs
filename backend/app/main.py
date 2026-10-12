@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 import asyncio
-from app.api.v1 import evaluate, health, moves, vector_search, videos
+from app.api.v1 import evaluate, health, moves, openings, vector_search, videos
 from app.config import settings
 from app.core.errors import (
     EngineError,
@@ -36,7 +36,7 @@ async def lifespan(app: FastAPI):
         # L'API démarre quand même : le moteur sera relancé à la 1ere requête
         logger.error("%s", exc)
     app.state.cache = MongoCache(settings.mongo_uri, settings.mongo_db)
-    catalog = OpeningCatalog.load()
+    app.state.catalog = catalog = OpeningCatalog.load()
     app.state.youtube = YouTubeService(settings, app.state.cache, catalog)
     app.state.vector_store = VectorStoreService(settings.milvus_uri, settings.milvus_collection)
     try:
@@ -66,6 +66,7 @@ app = FastAPI(title=settings.app_name, lifespan=lifespan)
 app.include_router(health.router, prefix=settings.api_v1_prefix)
 app.include_router(moves.router, prefix=settings.api_v1_prefix)
 app.include_router(evaluate.router, prefix=settings.api_v1_prefix)
+app.include_router(openings.router, prefix=settings.api_v1_prefix)
 app.include_router(vector_search.router, prefix=settings.api_v1_prefix)
 app.include_router(videos.router, prefix=settings.api_v1_prefix)
 

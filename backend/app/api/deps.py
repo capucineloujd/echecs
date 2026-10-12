@@ -20,3 +20,7 @@ def get_rag_graph(request: Request):
 
 def get_youtube(request: Request):
     return request.app.state.youtube
+
+
+def get_catalog(request: Request):
+    return request.app.state.catalog

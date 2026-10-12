@@ -1,10 +1,8 @@
 import json
 from datetime import datetime, timezone
-
 import httplib2
 import pytest
 from googleapiclient.errors import HttpError
-
 from app.config import Settings
 from app.rag.catalog import OpeningCatalog
 from app.services.cache import MemoryCache
@@ -16,6 +14,7 @@ from app.services.youtube import (
     parse_duration,
     relevance_terms,
 )
+
 
 
 def item(vid, title, views=50_000, likes=2_000, duration="PT12M30S", channel="c1", lang="fr", embeddable=True,

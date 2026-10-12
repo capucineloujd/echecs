@@ -1,4 +1,16 @@
 services:
+  frontend:
+    build: ./frontend
+    container_name: echecs-frontend
+    environment:
+      BACKEND_URL: http://backend:${BACKEND_PORT:-8000}
+    ports:
+      - "${FRONTEND_HOST_PORT:-4200}:80"
+    depends_on:
+      # Démarre sans attendre que le modèle d'embeddings soit chargé : l'interface affiche les erreurs en attendant
+      - backend
+    restart: unless-stopped
+
   backend:
     build: ./backend
     container_name: echecs-backend
