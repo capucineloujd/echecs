@@ -48,49 +48,80 @@ L'agent guide le joueur à partir de la position courante en combinant :
 └── README.md
 ```
 
-## Démarrage
+## Installation et démarrage
 
-Prérequis : Docker et Docker Compose.
+Procédure testée sur une installation fraîche (copie du dépôt, volumes vides,
+build sans cache) le 13/10/2026.
 
-1. Créer un fichier `.env` à la racine avec au minimum le token Lichess
-   (voir [Configuration](#configuration) pour les autres variables) :
+### Prérequis
 
-   ```bash
-   cat > .env <<EOF
-   LICHESS_TOKEN=lip_xxxxxxxx
-   YOUTUBE_API_KEY=AIza...
-   EOF
-   ```
+| Élément | Détail |
+|---|---|
+| Docker | Docker Desktop (ou Engine ≥ 25) avec Compose v2.20+ (`docker compose version`) |
+| Mémoire Docker | **12 Go minimum** (Docker Desktop → Settings → Resources → Memory) : le modèle d'embedding, Milvus et MongoDB tournent ensemble |
+| Disque | ~8 Go : images (~5,5 Go) + modèle d'embedding (1,2 Go) + données |
+| Ports libres | 4200 (interface), 8000 (API), 27017 (MongoDB), 19530 (Milvus) — modifiables, voir [Ports](#ports) |
+| Token Lichess | Obligatoire : lichess.org → Préférences → Accès API → token **sans aucune permission** |
+| Clé YouTube | Facultative (sans clé, le panneau vidéos propose un lien de recherche) : Google Cloud Console → activer *YouTube Data API v3* → Identifiants → Clé API |
 
-2. Lancer :
+### 1. Configurer
 
-   ```bash
-   docker compose up --build -d
-   ```
+Créer un fichier `.env` à la racine (il n'est pas versionné) :
 
-3. Au premier lancement, indexer les articles dans Milvus (télécharge le
-   modèle d'embedding, ~1,2 Go, puis le garde en cache dans un volume Docker).
-   L'API est arrêtée pendant l'ingestion : elle garde aussi le modèle en
-   mémoire, et deux copies simultanées saturent la mémoire de Docker.
+```bash
+cat > .env <<EOF
+LICHESS_TOKEN=lip_xxxxxxxx
+YOUTUBE_API_KEY=AIza...
+EOF
+```
 
-   ```bash
-   docker compose stop backend
-   docker compose run --rm backend python -m scripts.ingest   # ~10 min sur CPU
-   docker compose up -d backend
-   ```
+Les autres variables ont des valeurs par défaut (voir [Configuration](#configuration)).
 
-4. Attendre que l'API soit prête (chargement du modèle, ~20 s) : la colonne
-   STATUS de `docker compose ps` doit afficher `healthy` pour `echecs-backend`.
+### 2. Construire et lancer
 
-Mémoire : prévoir au moins 12 Go pour Docker (Docker Desktop → Settings →
-Resources → Memory).
+```bash
+docker compose up --build -d
+```
 
-Puis ouvrir :
+Premier lancement : ~5 min (téléchargement des images, build, téléchargement
+du modèle d'embedding au démarrage de l'API). Les six services doivent
+apparaître `healthy` :
+
+```bash
+docker compose ps
+```
+
+### 3. Indexer les articles (premier lancement uniquement)
+
+Milvus est vide après une installation fraîche : `/vector-search` répond `503`
+avec le message « Collection 'opening_chunks' absente : lancer l'ingestion ».
+L'API est arrêtée pendant l'ingestion, car elle garde aussi le modèle en
+mémoire, et deux copies simultanées saturent la mémoire de Docker.
+
+```bash
+docker compose stop backend
+docker compose run --rm backend python -m scripts.ingest   # 10 à 15 min sur CPU
+docker compose up -d backend
+```
+
+Résultat attendu : `183 chunks indexés dans la collection 'opening_chunks'`.
+L'index est conservé dans les volumes : inutile de relancer l'ingestion aux
+démarrages suivants (voir [Persistance des données](#persistance-des-données)).
+
+### 4. Ouvrir
 
 - http://localhost:4200 --> l'interface (échiquier + recommandations de l'agent)
-- http://localhost:8000 --> `{"message": "Hello World"}`
+- http://localhost:8000/docs --> documentation Swagger de l'API
 - http://localhost:8000/api/v1/healthcheck --> `{"status": "ok", ...}`
-- http://localhost:8000/docs --> documentation Swagger
+
+### Arrêter / relancer
+
+| Commande | Effet |
+|---|---|
+| `docker compose stop` | Arrête les conteneurs |
+| `docker compose up -d` | Relance (~30 s jusqu'à `healthy`, sans ingestion ni téléchargement) |
+| `docker compose down` | Supprime les conteneurs, **garde les données** |
+| `docker compose down -v` | Supprime aussi les volumes : index Milvus, cache, modèle. Il faudra refaire l'étape 3 |
 
 ## Endpoints
 
@@ -348,6 +379,127 @@ cd frontend && npm ci && npm test -- --watch=false
 ```
 
 
+## Persistance des données
+
+Tous les volumes sont des volumes nommés, déclarés dans `docker-compose.yml`.
+Le nom de projet est fixé (`name: echecs`), donc les volumes s'appellent
+`echecs_*` quel que soit le nom du dossier cloné.
+
+| Volume | Monté dans | Contenu |
+|---|---|---|
+| `echecs_hf_models` | `backend:/models` | Modèle Qwen3-Embedding (1,2 Go), téléchargé une seule fois |
+| `echecs_etcd_data` | `etcd:/etcd` | Métadonnées Milvus (schéma de la collection, index) |
+| `echecs_minio_data` | `minio:/minio_data` | Vecteurs et segments Milvus |
+| `echecs_milvus_data` | `milvus:/var/lib/milvus` | Données locales de Milvus (journal, cache) |
+| `echecs_mongo_data` | `mongodb:/data/db` | Cache des réponses YouTube (TTL 7 jours) |
+
+L'index Milvus est réparti sur trois volumes (etcd, MinIO, Milvus) : il faut
+les conserver tous les trois. `backend/data` est monté en bind mount (catalogue
+et articles bruts, versionnés dans Git).
+
+Vérifier :
+
+```bash
+docker volume ls --filter name=echecs_
+docker volume inspect echecs_minio_data      # Mountpoint, labels du projet compose
+```
+
+Tester la persistance en recréant tous les conteneurs :
+
+```bash
+docker compose down          # sans -v : les volumes restent
+docker compose up -d
+# l'index est toujours là (183 passages)
+docker exec echecs-backend python -c "from pymilvus import MilvusClient; \
+  print(MilvusClient('http://milvus:19530').get_collection_stats('opening_chunks'))"
+# le cache YouTube aussi : réponse instantanée, "cached": true, "quota_units_used": 0
+curl -s localhost:8000/api/v1/videos/espagnole | grep -o '"cached":[a-z]*'
+```
+
+Testé le 13/10/2026 : après `down` puis `up`, les 183 passages, les documents
+du cache MongoDB et le modèle étaient conservés, sans nouvelle ingestion ni
+nouveau téléchargement.
+
+## Démonstration
+
+### Positions préparées
+
+Chaque position se charge depuis le menu des ouvertures puis en cliquant les
+coups suggérés, ou en jouant les coups à la souris. Les FEN permettent de
+montrer la même chose directement dans l'API (`/docs` ou `curl`).
+
+| # | Position | Coups | Ce qu'elle montre |
+|---|---|---|---|
+| 1 | Partie espagnole | 1.e4 e5 2.Nf3 Nc6 3.Bb5 | Le cas nominal : théorie des maîtres (162 000 parties, a6 joué à 71 %), fiche de l'ouverture (histoire, Wikibooks + Wikipédia), vidéos en français lisibles dans la page |
+| 2 | Sicilienne Najdorf | 1.e4 c5 2.Nf3 d6 3.d4 cxd4 4.Nxd4 Nf6 5.Nc3 a6 | Nom précis de variante donné par Lichess (« Sicilian Defense: Najdorf Variation ») rattaché à la fiche « Défense sicilienne » du catalogue |
+| 3 | Attaque Fried Liver | Menu « Partie italienne », puis 3...Nf6 4.Ng5 d5 5.exd5 Nxd5 6.Nxf7 | Un piège classique pour jeunes joueurs : un seul coup possible (Kxf7, 100 %). Le nom d'ouverture reste affiché sur les positions que Lichess ne nomme pas |
+| 4 | Piège de l'éléphant | Menu « Gambit dame », puis 2...e6 3.Nc3 Nf6 4.Bg5 Nbd7 5.cxd5 exd5, puis **6.Nxd5??** à la souris | Sortie de la théorie : Stockfish prend le relais, « avantage décisif aux Noirs » (−3,9), ligne Nxd5 Bxd8 Bb4+ qui gagne la Dame |
+| 5 | Coup du berger | 1.e4 e5 2.Bc4 Nc6 3.Qh5 Nf6?? | Stockfish annonce le mat en 1 (Qxf7#). Jouer Qxf7# : l'interface affiche « Échec et mat » |
+| 6 | Ouverture hors catalogue | 1.a3 h5 2.Ra2 Rh6 (à la souris) | Cas dégradés : hors théorie, ouverture absente du catalogue (« Pas encore de fiche »), vidéos seulement sur demande pour économiser le quota |
+
+FEN correspondantes (les espaces peuvent être remplacés par `_` dans l'URL) :
+
+```
+1  r1bqkbnr/pppp1ppp/2n5/1B2p3/4P3/5N2/PPPP1PPP/RNBQK2R b KQkq - 3 3
+2  rnbqkb1r/1p2pppp/p2p1n2/8/3NP3/2N5/PPP2PPP/R1BQKB1R w KQkq - 0 6
+3  r1bqkb1r/ppp2Npp/2n5/3np3/2B5/8/PPPP1PPP/RNBQK2R b KQkq - 0 6
+4  r1bqkb1r/pppn1ppp/5n2/3N2B1/3P4/8/PP2PPPP/R2QKBNR b KQkq - 0 6
+5  r1bqkb1r/pppp1ppp/2n2n2/4p2Q/2B1P3/8/PPPP1PPP/RNB1K1NR w KQkq - 4 4
+6  rnbqkbn1/ppppppp1/7r/7p/8/P7/RPPPPPPP/1NBQKBNR w Kq - 2 3
+```
+
+Exemple :
+
+```bash
+curl -s "localhost:8000/api/v1/moves/r1bqkb1r/pppn1ppp/5n2/3N2B1/3P4/8/PP2PPPP/R2QKBNR_b_KQkq_-_0_6"
+```
+
+### Déroulé conseillé (~10 min)
+
+1. Position 1 : présenter les trois panneaux (coups, ouverture, vidéos) ; lancer une vidéo.
+2. Cocher « Évaluation Stockfish » : barre d'évaluation à côté de l'échiquier.
+3. Position 2 : montrer la reconnaissance de variante et la navigation ◀ ▶ (ou flèches du clavier).
+4. Positions 3 et 4 : les pièges, et le passage de la théorie à Stockfish.
+5. Position 5 : le mat.
+6. Position 6 : les cas dégradés.
+7. Montrer `/docs` (Swagger) et `docker compose ps` pour l'architecture.
+
+Avant la démo : lancer la stack 5 minutes avant, et parcourir une fois les
+positions pour remplir les caches (Lichess en mémoire, YouTube dans MongoDB) :
+les réponses sont alors instantanées.
+
+## Vérification de bout en bout
+
+Checklist à dérouler après une installation fraîche (dernière exécution :
+13/10/2026, tout est passé).
+
+| # | Vérification | Attendu |
+|---|---|---|
+| 1 | `docker compose ps` | 6 services `healthy` : frontend, backend, mongodb, milvus, etcd, minio |
+| 2 | `curl localhost:4200/api/v1/healthcheck` | `{"status":"ok",...}` : nginx → backend fonctionne |
+| 3 | Avant ingestion : `curl "localhost:8000/api/v1/vector-search?query=espagnole"` | `503`, message « lancer l'ingestion » |
+| 4 | Ingestion (étape 3) | `183 chunks indexés` |
+| 5 | http://localhost:4200, position 1 | Coups des maîtres, fiche « Partie espagnole » avec passages, 5 vidéos ; une vidéo se lit dans la page |
+| 6 | Position 4 | Message « Tu es sorti de la théorie », lignes Stockfish |
+| 7 | Case « Évaluation Stockfish » | Barre et score (« profondeur 18 ») |
+| 8 | ◀ ▶, « Nouvelle partie », ⇅ | Navigation, remise à zéro, échiquier retourné |
+| 9 | Fenêtre étroite (mobile) | Panneaux sous l'échiquier, pas de défilement horizontal |
+| 10 | `docker compose stop backend`, puis action dans l'interface | Message « Le serveur de l'agent ne répond pas » + bouton Réessayer ; relancer avec `docker compose up -d backend` |
+| 11 | `docker compose down` puis `up -d` | Données conservées (voir [Persistance](#persistance-des-données)) |
+
+## Dépannage
+
+| Symptôme | Cause et solution |
+|---|---|
+| `Cannot connect to the Docker daemon` | Docker Desktop n'est pas lancé : `open -a Docker` (macOS) |
+| `port is already allocated` | Port déjà utilisé : changer `FRONTEND_HOST_PORT`, `BACKEND_HOST_PORT`, `MONGO_HOST_PORT` ou `MILVUS_HOST_PORT` dans `.env` |
+| `/moves` répond `502` | `LICHESS_TOKEN` absent ou invalide dans `.env` (puis `docker compose up -d backend`) |
+| `/vector-search` répond `503` « lancer l'ingestion » | Étape 3 non faite (ou volumes supprimés par `down -v`) |
+| Ingestion interrompue (`Killed`, code 137) | Mémoire Docker insuffisante ou backend resté allumé : passer à 12 Go et arrêter le backend pendant l'ingestion |
+| Milvus `unhealthy` après une ingestion | Processeur saturé : garder `EMBEDDING_THREADS=4` ; `restart: unless-stopped` le relance |
+| Panneau vidéos : « quota épuisé » | Quota YouTube du jour atteint (10 000 unités) : retour à minuit, heure du Pacifique ; le cache MongoDB continue de servir les ouvertures déjà vues |
+| Interface : « Le serveur de l'agent ne répond pas » | Backend arrêté ou en train de charger le modèle (~20 s) : attendre `healthy` |
+
 ## Configuration
 
 Toute la configuration passe par des variables d'environnement, lues depuis le
@@ -398,4 +550,3 @@ etcd et MinIO (stockage interne de Milvus) ne sont pas exposés sur la machine :
 ils ne communiquent qu'à l'intérieur du réseau Docker, ce qui évite tout
 conflit sur les ports 2379, 9000 et 9001.
 
-Arrêt : `docker compose down`

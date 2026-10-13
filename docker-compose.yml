@@ -1,3 +1,6 @@
+# Nom de projet fixe : volumes (echecs_*) et images (echecs-*) identiques quel que soit le nom du dossier cloné
+name: echecs
+
 services:
   frontend:
     build: ./frontend

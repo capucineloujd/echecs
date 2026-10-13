@@ -7,6 +7,9 @@ from app.core.errors import VectorStoreError
 
 logger = logging.getLogger(__name__)
 
+# Code d'erreur Milvus « collection not found »
+COLLECTION_NOT_FOUND = 100
+
 OUTPUT_FIELDS = ["opening_slug", "opening_name", "eco", "fen", "section", "source", "lang", "url", "text"]
 
 
@@ -72,6 +75,11 @@ class VectorStoreService:
                 search_params={"metric_type": "COSINE", "params": {"ef": 64}},
             )
         except MilvusException as exc:
+            if exc.code == COLLECTION_NOT_FOUND:
+                # Cas typique d'une installation fraîche : l'ingestion n'a pas encore été lancée
+                raise VectorStoreError(
+                    f"Collection '{self._collection}' absente : lancer l'ingestion (python -m scripts.ingest, voir README)"
+                ) from exc
             raise VectorStoreError(f"Recherche Milvus impossible : {exc}") from exc
         return [{"score": hit["distance"], **hit["entity"]} for hit in results[0]]
 
