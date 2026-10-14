@@ -69,14 +69,21 @@ class Settings(BaseSettings):
     # Chaînes favorisées dans le classement (identifiants séparés par des virgules)
     youtube_preferred_channels: str = ""
 
-    # Agent (LLM Mistral)
+    # Agent : modèle de langage
+    # "ollama" (modèle local, gratuit) ou "mistral" (API, clé nécessaire)
+    llm_provider: str = "ollama"
+    llm_temperature: float = 0.2
+    llm_timeout_seconds: int = 120
+    # Ollama tourne sur la machine hôte (accès au GPU), le conteneur l'appelle via host.docker.internal
+    ollama_base_url: str = "http://host.docker.internal:11434"
+    ollama_model: str = "qwen3:8b"
+    ollama_num_ctx: int = 8192
+    ollama_reasoning: bool = False
     mistral_api_key: str = ""
     mistral_model: str = "mistral-small-latest"
-    mistral_temperature: float = 0.2
-    mistral_timeout_seconds: int = 30
     # Nombre max de tours d'appels d'outils avant que l'agent doive conclure
     agent_max_steps: int = 4
-    agent_timeout_seconds: float = 90.0
+    agent_timeout_seconds: float = 180.0
 
 
 settings = Settings()

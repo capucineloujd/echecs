@@ -1,6 +1,6 @@
 # Coach d'ouvertures d'échecs 
 
-L'agent (LLM Mistral orchestré par LangGraph) analyse la position courante,
+L'agent (LLM local Qwen3 via Ollama, orchestré par LangGraph) analyse la position courante,
 choisit lui-même ses sources et rédige un conseil adapté à un jeune joueur, en combinant :
 - la théorie des ouvertures (API Lichess Opening Explorer) ;
 - le contexte historique (Wikibooks Chess Opening Theory, indexé dans Milvus) ;
@@ -12,7 +12,8 @@ choisit lui-même ses sources et rédige un conseil adapté à un jeune joueur, 
 | Couche | Technologies |
 |---|---|
 | Frontend | Angular 22, ngx-chess-board, chess.js, nginx |
-| Backend | FastAPI, LangGraph, Mistral (langchain-mistralai) |
+| Backend | FastAPI, LangGraph |
+| LLM | Ollama + Qwen3 8B en local (gratuit, sans clé) ; Mistral en option |
 | Données | MongoDB, Milvus |
 | Moteur | Stockfish |
 | Orchestration | Docker Compose |
@@ -65,7 +66,7 @@ build sans cache) le 13/10/2026.
 | Disque | ~8 Go : images (~5,5 Go) + modèle d'embedding (1,2 Go) + données |
 | Ports libres | 4200 (interface), 8000 (API), 27017 (MongoDB), 19530 (Milvus) — modifiables, voir [Ports](#ports) |
 | Token Lichess | Obligatoire : lichess.org → Préférences → Accès API → token **sans aucune permission** |
-| Clé Mistral | Obligatoire pour le conseil du coach (sans clé, le reste de l'application fonctionne) : console.mistral.ai → API Keys |
+| Ollama | Pour le conseil du coach (sans Ollama, le reste de l'application fonctionne). Installé **sur la machine**, hors Docker : voir l'étape 2 |
 | Clé YouTube | Facultative (sans clé, le panneau vidéos propose un lien de recherche) : Google Cloud Console → activer *YouTube Data API v3* → Identifiants → Clé API |
 
 ### 1. Configurer
@@ -75,14 +76,28 @@ Créer un fichier `.env` à la racine (il n'est pas versionné) :
 ```bash
 cat > .env <<EOF
 LICHESS_TOKEN=lip_xxxxxxxx
-MISTRAL_API_KEY=xxxxxxxx
 YOUTUBE_API_KEY=AIza...
 EOF
 ```
 
 Les autres variables ont des valeurs par défaut (voir [Configuration](#configuration)).
 
-### 2. Construire et lancer
+### 2. Installer Ollama et le modèle de langage
+
+Ollama fait tourner le LLM du coach en local, gratuitement et sans compte.
+Il est installé directement sur la machine et non dans Docker : sur Mac, un
+conteneur n'a pas accès au GPU, et le modèle y serait beaucoup plus lent.
+Le backend l'appelle via `host.docker.internal:11434`.
+
+```bash
+brew install ollama                 # ou l'installateur de ollama.com (macOS, Windows, Linux)
+brew services start ollama          # lance le serveur Ollama et le relance au démarrage
+ollama pull qwen3:8b                # ~5 Go
+```
+
+Mémoire : ~6 Go en plus pendant que le coach répond (hors des 12 Go de Docker).
+
+### 3. Construire et lancer
 
 ```bash
 docker compose up --build -d
@@ -96,7 +111,7 @@ apparaître `healthy` :
 docker compose ps
 ```
 
-### 3. Indexer les articles (premier lancement uniquement)
+### 4. Indexer les articles (premier lancement uniquement)
 
 Milvus est vide après une installation fraîche : `/vector-search` répond `503`
 avec le message « Collection 'opening_chunks' absente : lancer l'ingestion ».
@@ -113,7 +128,7 @@ Résultat attendu : `183 chunks indexés dans la collection 'opening_chunks'`.
 L'index est conservé dans les volumes : inutile de relancer l'ingestion aux
 démarrages suivants (voir [Persistance des données](#persistance-des-données)).
 
-### 4. Ouvrir
+### 5. Ouvrir
 
 - http://localhost:4200 --> l'interface (échiquier + recommandations de l'agent)
 - http://localhost:8000/docs --> documentation Swagger de l'API
@@ -126,7 +141,7 @@ démarrages suivants (voir [Persistance des données](#persistance-des-données)
 | `docker compose stop` | Arrête les conteneurs |
 | `docker compose up -d` | Relance (~30 s jusqu'à `healthy`, sans ingestion ni téléchargement) |
 | `docker compose down` | Supprime les conteneurs, **garde les données** |
-| `docker compose down -v` | Supprime aussi les volumes : index Milvus, cache, modèle. Il faudra refaire l'étape 3 |
+| `docker compose down -v` | Supprime aussi les volumes : index Milvus, cache, modèle. Il faudra refaire l'étape 4 |
 
 ## Endpoints
 
@@ -307,45 +322,94 @@ après `detect_opening` :
                           └─ widen_search
 ```
 
-## Agent coach (Mistral + LangGraph)
+## Agent coach (LLM + LangGraph)
 
 ### Graphe (`app/agent/graph.py`)
 
 ```
-    START ──► agent ──(appels d'outils ?)──► tools ──┐
-                ▲  └──(réponse finale)──► END       │
-                └───────────────────────────────────┘
+  START ──► read_position ──► tools ──► decide ──(outil choisi)──► tools ──┐
+                                          ▲  └──(« answer »)──► answer ──► END
+                                          └─────────────────────────────────┘
 ```
 
-Boucle ReAct : le nœud `agent` appelle Mistral (`mistral-small-latest`) avec
-les outils ; tant que le modèle demande des outils, `tools` les exécute
-(`ToolNode` de LangGraph) et renvoie les résultats au modèle. Au-delà de
-`AGENT_MAX_STEPS` tours, le modèle est rappelé **sans outils** et doit conclure.
+| Nœud | Rôle |
+|---|---|
+| `read_position` | Lit toujours la position en premier (outil `get_position_moves`) : théorie Lichess si elle est connue, sinon Stockfish |
+| `decide` | Le LLM choisit la prochaine étape : un outil (avec son argument) ou `answer`. Sortie structurée (JSON validé par Pydantic) |
+| `tools` | Exécute l'outil (`ToolNode` de LangGraph) et renvoie le résultat au LLM |
+| `answer` | Le LLM rédige le conseil, streamé vers l'interface |
+
+Garde-fous : au plus `AGENT_MAX_STEPS` décisions ; un outil redemandé avec le
+même argument, ou une décision illisible, mène directement à la réponse.
 
 ### Outils : l'agent choisit ses sources
 
-| Outil | Source | Quand le LLM l'utilise (consigne du prompt) |
+| Outil | Source | Quand le LLM le choisit (consigne du prompt) |
 |---|---|---|
-| `get_position_moves` | `PositionAnalysisService` : Lichess si la position est dans la théorie, sinon Stockfish | Toujours en premier : savoir où on en est |
-| `evaluate_position(move_san?)` | Stockfish, sur la position ou après un coup | Vérifier un coup précis (« et si je joue Nxd5 ? ») ou dire qui est mieux |
-| `search_opening_knowledge(query)` | Graphe RAG (Milvus) | Expliquer les idées, plans, pièges d'une ouverture identifiée |
-| `find_videos(opening)` | YouTube | Seulement si l'élève demande des vidéos (quota) |
+| `get_position_moves` | `PositionAnalysisService` : Lichess si la position est dans la théorie, sinon Stockfish | Toujours, au départ (nœud `read_position`) |
+| `evaluate_position(move_san)` | Stockfish après un coup | L'élève propose un coup (« et si je joue Nxd5 ? ») |
+| `search_opening_knowledge(query)` | Graphe RAG (Milvus) | L'élève demande les plans, idées, pièges ou l'histoire |
+| `find_videos(opening)` | YouTube | L'élève demande des vidéos |
 
-Comportement attendu d'après le prompt : « que jouer ? » dans l'espagnole →
-théorie puis articles ; « et si je joue Nxd5 ? » → théorie puis Stockfish sur Nxd5.
+### Choix de conception, et pourquoi
 
-Choix de conception :
+Les choix suivants viennent de tests réels sur les positions de démo
+(Qwen3 8B, Mac M1 Max) :
+
+| Version testée | Résultat |
+|---|---|
+| ReAct classique (outils facultatifs, le LLM appelle ce qu'il veut) | Le modèle répond souvent **sans appeler d'outil** : il a inventé une « partie italienne » dans une Najdorf, et n'a pas vérifié Nxd5 |
+| + lecture de la position garantie au départ | Plus d'ouverture inventée, mais aucun outil supplémentaire appelé |
+| + mode « réflexion » de Qwen3 | Vérifie parfois le coup, mais réponses 2 à 4 fois plus lentes et chiffres inventés |
+| Qwen3 30B-A3B | N'arrive pas à désactiver sa réflexion : elle apparaît dans la réponse (en anglais), jusqu'à 66 s |
+| **Décision explicite à chaque tour (version retenue)** | Bons outils dans les 5 cas testés, réponses en 8 à 15 s |
+
+Un petit modèle local ignore facilement un outil « facultatif ». L'obliger à
+écrire sa décision (`{"tool": "evaluate_position", "argument": "Nxd5"}`)
+le fait réellement réfléchir à ses sources. C'est toujours lui qui choisit.
+
+Autres choix :
 - **La FEN ne passe pas par le LLM** : les outils la lisent dans l'état du
   graphe (`InjectedState`). Le modèle ne peut pas la recopier de travers.
-- **Position décrite sous trois formes** dans le message (FEN, coups joués,
-  diagramme ASCII), comme dans l'étude Kaggle Game Arena : les LLM lisent mal
-  une FEN seule.
-- **Le LLM ne calcule pas** : le prompt lui interdit de proposer un coup absent
-  des résultats d'outils ; les évaluations viennent de Stockfish.
+- **Position décrite sous trois formes** (FEN, coups joués, diagramme ASCII),
+  comme dans l'étude Kaggle Game Arena : les LLM lisent mal une FEN seule.
+- **Résultats d'outils pré-interprétés** : évaluation en mots (« avantage
+  décisif aux Noirs »), bilan matériel au bout de chaque ligne Stockfish
+  (« les Noirs gagnent une pièce »), nom français de l'ouverture, coup de
+  référence. Le modèle reformule, il ne calcule pas.
+- **Rappel final** avant la rédaction (source réellement utilisée, coup de
+  référence, question) : c'est la fin du contexte qu'un petit modèle suit le mieux.
 - **Erreur d'outil** (Lichess en panne...) : renvoyée au LLM comme résultat
-  (`handle_tool_errors`), qui peut s'appuyer sur un autre outil.
+  (`handle_tool_errors`).
 - **Réponse** : français, tutoiement, 120 mots max, en trois temps (où on en
   est, coup conseillé et pourquoi, idée à retenir), sources citées.
+
+### Résultats sur les positions de démo (Qwen3 8B)
+
+| Position et question | Outils choisis | Temps |
+|---|---|---|
+| Espagnole, « que jouer ? » | lecture de la position | ~12 s |
+| Piège de l'éléphant, « et si je prends en d5 avec mon cavalier ? » | lecture + Stockfish sur Nxd5 | ~14 s |
+| Coup du berger | lecture (le mat est trouvé) | ~9 s |
+| 1.a3 h5 2.Ra2 Rh6 | lecture | ~8 s |
+| Najdorf, « quels sont les plans ? » | lecture + articles | ~14 s |
+
+Limites connues d'un modèle de 8 milliards de paramètres : formulations
+parfois approximatives (ex. « sorti de la théorie » pour un coup hypothétique,
+source mal attribuée), et explications des plans assez générales, car les
+articles indexés sont surtout en anglais. Un modèle plus gros via l'API
+Mistral (`LLM_PROVIDER=mistral`, non testé faute de clé) devrait donner de
+meilleures réponses.
+
+### Changer de modèle
+
+| Variable | Effet |
+|---|---|
+| `LLM_PROVIDER=ollama` (défaut) | Modèle local `OLLAMA_MODEL` (défaut `qwen3:8b`), rien ne sort de la machine |
+| `LLM_PROVIDER=mistral` | API Mistral, `MISTRAL_API_KEY` obligatoire, modèle `MISTRAL_MODEL` |
+
+Le graphe, les outils, le streaming et l'interface ne dépendent pas du
+fournisseur (`app/agent/llm.py`).
 
 ### Logique métier séparée de l'API
 
@@ -363,9 +427,11 @@ empêche nginx de bufferiser le flux.
 
 | Cas | Comportement |
 |---|---|
-| Pas de `MISTRAL_API_KEY` | `503` « Coach indisponible » ; le reste de l'application fonctionne |
+| `LLM_PROVIDER=mistral` sans `MISTRAL_API_KEY` | `503` « Coach indisponible » ; le reste de l'application fonctionne |
+| Ollama arrêté | Événement `error` « Modèle de langage injoignable (Ollama est-il lancé ?) » |
+| Modèle non téléchargé | Événement `error` « lancer ollama pull qwen3:8b » |
 | FEN invalide | `422` avant l'ouverture du flux |
-| Clé invalide, limite Mistral (429), Mistral injoignable | Événement `error` avec un message lisible (2 nouvelles tentatives automatiques avant) |
+| Mistral : clé invalide, limite (429), service injoignable | Événement `error` avec un message lisible (2 nouvelles tentatives automatiques avant) |
 | Réponse trop longue | Timeout global `AGENT_TIMEOUT_SECONDS` → événement `error` |
 | L'élève change de position pendant la réponse | La requête est annulée, le conseil effacé |
 
@@ -558,10 +624,11 @@ Checklist à dérouler après une installation fraîche (dernière exécution :
 | 1 | `docker compose ps` | 6 services `healthy` : frontend, backend, mongodb, milvus, etcd, minio |
 | 2 | `curl localhost:4200/api/v1/healthcheck` | `{"status":"ok",...}` : nginx → backend fonctionne |
 | 3 | Avant ingestion : `curl "localhost:8000/api/v1/vector-search?query=espagnole"` | `503`, message « lancer l'ingestion » |
-| 4 | Ingestion (étape 3) | `183 chunks indexés` |
+| 4 | Ingestion (étape 4) | `183 chunks indexés` |
 | 5 | http://localhost:4200, position 1 | Coups des maîtres, fiche « Partie espagnole » avec passages, 5 vidéos ; une vidéo se lit dans la page |
 | 6 | Position 4 | Message « Tu es sorti de la théorie », lignes Stockfish |
 | 7 | Case « Évaluation Stockfish » | Barre et score (« profondeur 18 ») |
+| 7 bis | `curl localhost:11434/api/version` | Ollama répond ; `ollama list` contient `qwen3:8b` |
 | 8 | « Demander au coach » (position 1) | Outils affichés (Théorie Lichess, Articles...), puis conseil en français au fil de l'eau |
 | 8 bis | ◀ ▶, « Nouvelle partie », ⇅ | Navigation, remise à zéro, échiquier retourné |
 | 9 | Fenêtre étroite (mobile) | Panneaux sous l'échiquier, pas de défilement horizontal |
@@ -575,12 +642,13 @@ Checklist à dérouler après une installation fraîche (dernière exécution :
 | `Cannot connect to the Docker daemon` | Docker Desktop n'est pas lancé : `open -a Docker` (macOS) |
 | `port is already allocated` | Port déjà utilisé : changer `FRONTEND_HOST_PORT`, `BACKEND_HOST_PORT`, `MONGO_HOST_PORT` ou `MILVUS_HOST_PORT` dans `.env` |
 | `/moves` répond `502` | `LICHESS_TOKEN` absent ou invalide dans `.env` (puis `docker compose up -d backend`) |
-| `/vector-search` répond `503` « lancer l'ingestion » | Étape 3 non faite (ou volumes supprimés par `down -v`) |
+| `/vector-search` répond `503` « lancer l'ingestion » | Étape 4 non faite (ou volumes supprimés par `down -v`) |
 | Ingestion interrompue (`Killed`, code 137) | Mémoire Docker insuffisante ou backend resté allumé : passer à 12 Go et arrêter le backend pendant l'ingestion |
 | Milvus `unhealthy` après une ingestion | Processeur saturé : garder `EMBEDDING_THREADS=4` ; `restart: unless-stopped` le relance |
 | Panneau vidéos : « quota épuisé » | Quota YouTube du jour atteint (10 000 unités) : retour à minuit, heure du Pacifique ; le cache MongoDB continue de servir les ouvertures déjà vues |
-| Coach : « Coach indisponible : MISTRAL_API_KEY absente » | Ajouter la clé dans `.env` puis `docker compose up -d backend` |
-| Coach : « Trop de demandes au modèle Mistral » | Limite de l'offre Mistral (offre gratuite : quelques requêtes par seconde) : attendre une minute |
+| Coach : « Modèle de langage injoignable » | Ollama n'est pas lancé : `brew services start ollama` (vérifier avec `curl localhost:11434/api/version`) |
+| Coach : « Modèle absent d'Ollama » | `ollama pull qwen3:8b` |
+| Coach : première réponse lente (~20 s) | Ollama charge le modèle en mémoire à la première demande, puis le garde quelques minutes |
 | Interface : « Le serveur de l'agent ne répond pas » | Backend arrêté ou en train de charger le modèle (~20 s) : attendre `healthy` |
 
 ## Configuration
@@ -619,12 +687,17 @@ par défaut, sauf `LICHESS_TOKEN`.
 | `YOUTUBE_MIN_DURATION_SECONDS` / `YOUTUBE_MAX_DURATION_SECONDS` | `240` / `3600` | Durée acceptée |
 | `YOUTUBE_CACHE_TTL_DAYS` | `7` | Durée du cache des résultats |
 | `YOUTUBE_PREFERRED_CHANNELS` | *(vide)* | Identifiants de chaînes favorisées, séparés par des virgules |
-| `MISTRAL_API_KEY` | *(vide)* | Clé API Mistral (obligatoire pour le conseil du coach) |
-| `MISTRAL_MODEL` | `mistral-small-latest` | Modèle Mistral (doit gérer le tool calling) |
-| `MISTRAL_TEMPERATURE` | `0.2` | Température : basse pour des conseils stables |
-| `MISTRAL_TIMEOUT_SECONDS` | `30` | Timeout d'un appel au modèle |
-| `AGENT_MAX_STEPS` | `4` | Tours d'appels d'outils avant que l'agent doive conclure |
-| `AGENT_TIMEOUT_SECONDS` | `90` | Durée maximale d'une réponse complète |
+| `LLM_PROVIDER` | `ollama` | Fournisseur du LLM du coach : `ollama` (local) ou `mistral` (API) |
+| `LLM_TEMPERATURE` | `0.2` | Température : basse pour des conseils stables |
+| `LLM_TIMEOUT_SECONDS` | `120` | Timeout d'un appel au modèle |
+| `OLLAMA_BASE_URL` | `http://host.docker.internal:11434` | Adresse d'Ollama vue depuis le conteneur |
+| `OLLAMA_MODEL` | `qwen3:8b` | Modèle Ollama (doit gérer la sortie structurée) |
+| `OLLAMA_NUM_CTX` | `8192` | Taille du contexte (celle d'Ollama par défaut est trop courte) |
+| `OLLAMA_REASONING` | `false` | Mode « réflexion » de Qwen3 (plus lent, pas plus fiable dans nos tests) |
+| `MISTRAL_API_KEY` | *(vide)* | Clé API Mistral (si `LLM_PROVIDER=mistral`) |
+| `MISTRAL_MODEL` | `mistral-small-latest` | Modèle Mistral |
+| `AGENT_MAX_STEPS` | `4` | Décisions max avant que l'agent doive rédiger sa réponse |
+| `AGENT_TIMEOUT_SECONDS` | `180` | Durée maximale d'une réponse complète |
 
 ### Ports
 

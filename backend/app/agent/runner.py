@@ -6,8 +6,11 @@ from collections.abc import AsyncIterator
 from typing import Any
 
 import httpx
+import ollama
 from langchain_core.messages import AIMessage
 from langgraph.errors import GraphRecursionError
+
+from app.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -27,12 +30,16 @@ def _error_message(exc: BaseException) -> str:
     if isinstance(exc, httpx.HTTPStatusError):
         status = exc.response.status_code
         if status == 401:
-            return "Clé API Mistral invalide (MISTRAL_API_KEY)."
+            return "Clé API du modèle de langage invalide."
         if status == 429:
-            return "Trop de demandes au modèle Mistral : réessaie dans une minute."
-        return f"Le service Mistral a répondu une erreur {status}."
-    if isinstance(exc, httpx.HTTPError):
-        return "Service Mistral injoignable."
+            return "Trop de demandes au modèle de langage : réessaie dans une minute."
+        return f"Le modèle de langage a répondu une erreur {status}."
+    if isinstance(exc, ollama.ResponseError):
+        if exc.status_code == 404:
+            return f"Modèle absent d'Ollama : lancer « ollama pull {settings.ollama_model} »."
+        return f"Ollama a répondu une erreur : {exc.error}"
+    if isinstance(exc, (httpx.HTTPError, ConnectionError)):
+        return "Modèle de langage injoignable (Ollama est-il lancé sur la machine ?)."
     return "Erreur inattendue du coach."
 
 
@@ -49,12 +56,13 @@ async def stream_agent(
                 if mode == "messages":
                     message, metadata = chunk
                     # Morceaux (AIMessageChunk) si le modèle streame, message complet sinon
-                    if metadata.get("langgraph_node") == "agent" and isinstance(message, AIMessage):
+                    # Seul le nœud de rédaction est streamé (pas le JSON des décisions)
+                    if metadata.get("langgraph_node") == "answer" and isinstance(message, AIMessage):
                         if text := _text(message.content):
                             yield {"event": "token", "text": text}
                     continue
                 for node, update in chunk.items():
-                    if node == "agent":
+                    if node in ("read_position", "decide") and update.get("messages"):
                         for call in update["messages"][-1].tool_calls:
                             tools_used.append(call["name"])
                             yield {"event": "tool_start", "id": call["id"], "name": call["name"], "args": call["args"]}
@@ -68,7 +76,7 @@ async def stream_agent(
                             }
         yield {"event": "done", "tools_used": tools_used}
     except Exception as exc:  # le flux HTTP est déjà ouvert : l'erreur est envoyée comme un événement
-        if isinstance(exc, (TimeoutError, httpx.HTTPError)):
+        if isinstance(exc, (TimeoutError, httpx.HTTPError, ConnectionError, ollama.ResponseError)):
             logger.warning("Agent en erreur : %r", exc)
         else:
             logger.exception("Agent en erreur")

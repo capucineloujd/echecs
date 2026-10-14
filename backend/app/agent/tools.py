@@ -1,5 +1,10 @@
-"""Outils de l'agent. La FEN vient de l'état du graphe (InjectedState) et non des arguments
-du LLM : il ne peut pas la recopier de travers."""
+"""Outils de l'agent.
+
+- La FEN vient de l'état du graphe (InjectedState) et non des arguments du LLM :
+  il ne peut pas la recopier de travers.
+- Les résultats sont pré-interprétés (évaluation en mots, bilan matériel des lignes,
+  nom français de l'ouverture) : un petit modèle local n'a pas à faire de calcul.
+"""
 
 from typing import TYPE_CHECKING, Annotated
 
@@ -7,6 +12,7 @@ import chess
 from langchain_core.tools import tool
 from langgraph.prebuilt import InjectedState
 
+from app.rag.catalog import OpeningCatalog
 from app.schemas import Evaluation, MovesResponse, Score
 from app.services.position_analysis import PositionAnalysisService
 from app.services.stockfish import StockfishService
@@ -15,38 +21,110 @@ if TYPE_CHECKING:
     from app.services.youtube import YouTubeService
 
 MAX_PASSAGE_CHARS = 700
+PIECE_VALUES = {chess.PAWN: 1, chess.KNIGHT: 3, chess.BISHOP: 3, chess.ROOK: 5, chess.QUEEN: 9}
+GAIN_NAMES = {1: "un pion", 2: "deux pions", 3: "une pièce (Cavalier ou Fou)", 5: "une Tour", 9: "la Dame"}
 
 
-def format_score(score: Score) -> str:
+def side(color: chess.Color) -> str:
+    return "Blancs" if color == chess.WHITE else "Noirs"
+
+
+def describe_score(score: Score) -> str:
+    """Évaluation Stockfish (point de vue des Blancs) traduite en mots."""
     if score.mate is not None:
-        return f"mat en {abs(score.mate)} pour les {'Blancs' if score.mate > 0 else 'Noirs'}"
-    return f"{(score.centipawns or 0) / 100:+.2f}"
+        if score.mate == 0:
+            return "échec et mat"
+        return f"les {'Blancs' if score.mate > 0 else 'Noirs'} matent en {abs(score.mate)} coup(s)"
+    cp = score.centipawns or 0
+    leader = "Blancs" if cp > 0 else "Noirs"
+    if abs(cp) < 30:
+        verdict = "position équilibrée"
+    elif abs(cp) < 100:
+        verdict = f"léger avantage aux {leader}"
+    elif abs(cp) < 250:
+        verdict = f"net avantage aux {leader}"
+    else:
+        verdict = f"avantage décisif aux {leader}"
+    return f"{verdict} ({cp / 100:+.2f})"
 
 
-def format_engine(evaluation: Evaluation) -> str:
+def material(board: chess.Board) -> int:
+    """Matériel des Blancs moins celui des Noirs."""
+    return sum(
+        value * (len(board.pieces(piece, chess.WHITE)) - len(board.pieces(piece, chess.BLACK)))
+        for piece, value in PIECE_VALUES.items()
+    )
+
+
+def material_outcome(board: chess.Board, pv_san: list[str]) -> str:
+    """Bilan matériel au bout d'une ligne : rend visibles les pièges qui gagnent une pièce."""
+    end = board.copy(stack=False)
+    for san in pv_san:
+        end.push_san(san)
+    if end.is_checkmate():
+        return f"finit par l'échec et mat des {side(end.turn)}"
+    delta = material(end) - material(board)
+    if abs(delta) < 1:
+        return "matériel égal"
+    winner = "Blancs" if delta > 0 else "Noirs"
+    # Ex. 4 = une pièce et un pion : on donne la valeur totale, en précisant l'échelle
+    gain = GAIN_NAMES.get(abs(delta), f"du matériel valant {abs(delta)} pions (Cavalier/Fou = 3, Tour = 5, Dame = 9)")
+    return f"les {winner} gagnent {gain}"
+
+
+def format_engine(board: chess.Board, evaluation: Evaluation) -> str:
     if evaluation.game_over:
         return f"Partie terminée ({evaluation.game_over})."
-    lines = [f"Évaluation Stockfish (profondeur {evaluation.depth}) : {format_score(evaluation.score)}"]
+    lines = [
+        f"Stockfish (profondeur {evaluation.depth}), {side(board.turn)} au trait : {describe_score(evaluation.score)}.",
+        "Meilleures suites (le premier coup est celui à jouer) :",
+    ]
     for line in evaluation.lines:
-        lines.append(f"  {line.rank}) {' '.join(line.pv_san[:6])} ({format_score(line.score)})")
+        lines.append(
+            f"  {line.rank}) {' '.join(line.pv_san[:8])} : {describe_score(line.score)}, "
+            f"{material_outcome(board, line.pv_san[:8])}"
+        )
+    mate = evaluation.score.mate
+    if mate and (mate > 0) == (board.turn == chess.WHITE) and evaluation.lines:
+        # Le camp au trait a un mat : les autres suites ne sont que du bruit pour l'élève
+        lines.append(f"Il y a un mat : seul le coup {evaluation.lines[0].pv_san[0]} compte.")
     return "\n".join(lines)
 
 
-def format_moves(result: MovesResponse) -> str:
-    opening = f"{result.opening.eco} {result.opening.name}" if result.opening else "non nommée par Lichess"
+def french_name(catalog: OpeningCatalog | None, lichess_name: str) -> str:
+    detected = catalog.detect(lichess_name) if catalog else None
+    return f"{detected.name} ({lichess_name})" if detected else lichess_name
+
+
+def format_moves(board: chess.Board, result: MovesResponse, catalog: OpeningCatalog | None = None) -> str:
+    opening = (
+        f"{french_name(catalog, result.opening.name)}, code ECO {result.opening.eco}"
+        if result.opening
+        else "non nommée par Lichess (reprendre le nom donné pour les coups précédents s'il y en a un)"
+    )
     if result.in_theory:
         base = "parties de maîtres" if result.database == "masters" else "parties en ligne Lichess"
-        lines = [f"Source : Lichess ({base}), {result.total_games} parties. Ouverture : {opening}.", "Coups joués :"]
+        lines = [
+            f"Source choisie : théorie Lichess ({base}), position connue ({result.total_games} parties).",
+            f"Ouverture : {opening}.",
+            f"Coup de référence : {result.moves[0].san} (le plus joué par les maîtres).",
+            f"Coups joués par les {side(board.turn)} dans cette position, du plus fréquent au moins fréquent :",
+        ]
         for move in result.moves[:5]:
             share = round(100 * move.games / result.total_games) if result.total_games else 0
+            own = move.white_pct if board.turn == chess.WHITE else move.black_pct
+            other = move.black_pct if board.turn == chess.WHITE else move.white_pct
             lines.append(
-                f"  {move.san} : {share} % des parties (Blancs gagnent {move.white_pct} %, "
-                f"nulles {move.draw_pct} %, Noirs gagnent {move.black_pct} %)"
+                f"  {move.san} : joué dans {share} % des parties ; ensuite les {side(board.turn)} gagnent {own} %, "
+                f"nulles {move.draw_pct} %, les {side(not board.turn)} gagnent {other} %"
             )
+        lines.append("Le coup le plus fréquent est la référence ; des pourcentages proches sont normaux en ouverture.")
         return "\n".join(lines)
-    reason = result.warning or f"position hors théorie ({result.total_games} parties connues)"
-    engine = format_engine(result.engine) if result.engine else "Évaluation indisponible."
-    return f"Source : Stockfish, {reason}. Ouverture : {opening}.\n{engine}"
+    reason = result.warning or f"position sortie de la théorie (seulement {result.total_games} parties connues)"
+    engine = format_engine(board, result.engine) if result.engine else "Évaluation indisponible."
+    best = result.engine.best_move_san if result.engine else None
+    reference = f"Coup de référence : {best} (meilleur coup selon Stockfish).\n" if best else ""
+    return f"Source choisie : Stockfish, {reason}.\nOuverture : {opening}.\n{reference}{engine}"
 
 
 def build_tools(
@@ -55,12 +133,14 @@ def build_tools(
     rag_graph=None,
     youtube: "YouTubeService | None" = None,
     rag_min_score: float = 0.35,
+    catalog: OpeningCatalog | None = None,
 ):
     @tool
     async def get_position_moves(state: Annotated[dict, InjectedState]) -> str:
         """Coups théoriques de la position actuelle (Lichess, parties de maîtres) avec le nom de
         l'ouverture. Si la position est sortie de la théorie, renvoie l'analyse Stockfish à la place."""
-        return format_moves(await analysis.analyze(chess.Board(state["fen"])))
+        board = chess.Board(state["fen"])
+        return format_moves(board, await analysis.analyze(board), catalog)
 
     @tool
     async def evaluate_position(state: Annotated[dict, InjectedState], move_san: str | None = None) -> str:
@@ -73,8 +153,11 @@ def build_tools(
                 board.push_san(move_san)
             except ValueError:
                 return f"Le coup {move_san} est illégal dans cette position."
-            prefix = f"Après {move_san} : "
-        return prefix + format_engine(await stockfish.evaluate(board))
+            prefix = (
+                f"Coup testé : {move_san} des {side(not board.turn)} (coup hypothétique, pas encore joué). "
+                f"Ensuite c'est aux {side(board.turn)} de jouer.\n"
+            )
+        return prefix + format_engine(board, await stockfish.evaluate(board))
 
     @tool
     async def search_opening_knowledge(query: str) -> str:

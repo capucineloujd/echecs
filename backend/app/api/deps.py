@@ -39,5 +39,5 @@ def get_position_analysis(
 def get_agent(request: Request):
     agent = getattr(request.app.state, "agent", None)
     if agent is None:
-        raise AgentUnavailableError("Coach indisponible : MISTRAL_API_KEY absente de la configuration")
+        raise AgentUnavailableError("Coach indisponible : modèle de langage non configuré (voir LLM_PROVIDER dans le README)")
     return agent

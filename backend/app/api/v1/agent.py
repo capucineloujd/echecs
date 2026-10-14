@@ -14,7 +14,7 @@ router = APIRouter(tags=["agent"])
 
 @router.post("/agent/analyze")
 async def analyze(request: AgentRequest, agent=Depends(get_agent)):
-    """Le coach analyse la position : il choisit ses outils (Lichess, Stockfish, articles, vidéos)
+    """Le coach (LLM local Ollama ou Mistral) analyse la position : il choisit ses outils (Lichess, Stockfish, articles, vidéos)
     puis rédige un conseil. Réponse en flux SSE :
 
     - `tool_start` / `tool_end` : outil appelé par l'agent ;

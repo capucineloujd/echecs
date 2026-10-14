@@ -22,6 +22,9 @@ services:
       BACKEND_PORT: ${BACKEND_PORT:-8000}
       MILVUS_URI: http://milvus:19530
       MONGO_URI: mongodb://mongodb:27017
+    # Accès à Ollama lancé sur la machine hôte (déjà défini par Docker Desktop, nécessaire sous Linux)
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     ports:
       - "${BACKEND_HOST_PORT:-8000}:${BACKEND_PORT:-8000}"
     volumes:

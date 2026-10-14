@@ -15,6 +15,7 @@ from app.core.errors import (
     VectorStoreError,
 )
 from app.agent.graph import build_agent_graph
+from app.agent.llm import build_chat_model
 from app.agent.tools import build_tools
 from app.services.lichess import LichessExplorerService
 from app.services.position_analysis import PositionAnalysisService
@@ -65,24 +66,17 @@ async def lifespan(app: FastAPI):
 
 
 def build_agent(app: FastAPI):
-    if not settings.mistral_api_key:
-        logger.warning("Coach désactivé : MISTRAL_API_KEY absente")
+    model = build_chat_model(settings)
+    if model is None:
         return None
-    from langchain_mistralai import ChatMistralAI
-
-    model = ChatMistralAI(
-        model=settings.mistral_model,
-        api_key=settings.mistral_api_key,
-        temperature=settings.mistral_temperature,
-        timeout=settings.mistral_timeout_seconds,
-        max_retries=2,
-    )
+    logger.info("Coach : %s", settings.llm_provider)
     tools = build_tools(
         PositionAnalysisService(settings, app.state.lichess, app.state.stockfish),
         app.state.stockfish,
         getattr(app.state, "rag_graph", None),
         app.state.youtube,
         settings.rag_min_score,
+        app.state.catalog,
     )
     return build_agent_graph(model, tools, settings.agent_max_steps)
 
