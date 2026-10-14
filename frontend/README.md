@@ -1,4 +1,4 @@
-# Frontend — Coach d'ouvertures
+# Frontend du Coach d'ouvertures
 
 Application Angular 22 (composants standalone, signals, sans zone.js).
 Voir le README à la racine du projet pour l'architecture et le lancement avec Docker.

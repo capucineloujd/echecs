@@ -65,7 +65,7 @@ async def test_graph_filters_on_detected_opening(catalog):
 
     assert store.calls == ["espagnole"]
     assert [r["text"] for r in state["results"]] == ["Ruy López, 1561", "Berlinoise"]
-    assert state["context"].startswith("[1] Espagnole (C60) — Histoire")
+    assert state["context"].startswith("[1] Espagnole (C60), Histoire")
 
 
 async def test_graph_drops_low_scores_and_duplicates(catalog):
@@ -106,7 +106,7 @@ async def test_graph_proposes_videos_for_detected_opening(catalog):
     state = await run(build_rag_graph(FakeEmbedder(), store, catalog, youtube), "plans de l'espagnole")
     assert youtube.calls == ["espagnole"]
     assert state["videos"].status == "ok"
-    assert state["results"][0]["text"] == "Ruy López"  # la branche Milvus a bien tourné aussi
+    assert state["results"][0]["text"] == "Ruy López"
 
 
 async def test_graph_no_videos_without_detected_opening(catalog):

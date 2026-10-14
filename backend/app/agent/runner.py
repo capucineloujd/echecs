@@ -1,5 +1,3 @@
-"""Exécution de l'agent en flux d'événements, pour l'affichage au fil de l'eau dans l'interface."""
-
 import asyncio
 import logging
 from collections.abc import AsyncIterator
@@ -46,7 +44,6 @@ def _error_message(exc: BaseException) -> str:
 async def stream_agent(
     graph, fen: str, moves: list[str], question: str | None, timeout_seconds: float, max_steps: int
 ) -> AsyncIterator[dict[str, Any]]:
-    """Événements : tool_start, tool_end, token, done, ou error (toujours en dernier)."""
     inputs = {"messages": [], "fen": fen, "moves": moves, "question": question, "steps": 0}
     config = {"recursion_limit": 2 * max_steps + 4}
     tools_used: list[str] = []
@@ -55,7 +52,6 @@ async def stream_agent(
             async for mode, chunk in graph.astream(inputs, config=config, stream_mode=["messages", "updates"]):
                 if mode == "messages":
                     message, metadata = chunk
-                    # Morceaux (AIMessageChunk) si le modèle streame, message complet sinon
                     # Seul le nœud de rédaction est streamé (pas le JSON des décisions)
                     if metadata.get("langgraph_node") == "answer" and isinstance(message, AIMessage):
                         if text := _text(message.content):

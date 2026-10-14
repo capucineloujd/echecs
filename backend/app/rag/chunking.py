@@ -3,7 +3,6 @@ from dataclasses import dataclass
 
 HEADING = re.compile(r"^(={2,6})\s*(.*?)\s*\1\s*$", re.M)
 
-# Sections sans valeur pour la recherche (listes de liens, tableaux aplatis...)
 SKIPPED_SECTIONS = {
     "references", "notes", "notes et références", "bibliographie", "liens externes",
     "external links", "see also", "voir aussi", "articles connexes", "theory table",
@@ -19,10 +18,6 @@ class Chunk:
 
 
 def split_sections(text: str) -> list[tuple[str, str]]:
-    """Découpe un texte MediaWiki brut en (chemin de section, contenu).
-
-    Le chemin garde la hiérarchie : "Variantes > La variante Winawer".
-    """
     text = FOOTER.sub("", text)
     sections, path = [], []
     last_end, current = 0, "Introduction"
@@ -43,11 +38,6 @@ def split_sections(text: str) -> list[tuple[str, str]]:
 
 
 def chunk_text(text: str, max_chars: int = 1200, min_chars: int = 80) -> list[Chunk]:
-    """Regroupe les paragraphes d'une même section jusqu'à max_chars.
-
-    On ne coupe jamais au milieu d'un paragraphe (sauf s'il dépasse seul la limite)
-    et on reprend le dernier paragraphe du chunk précédent pour garder le fil.
-    """
     chunks = []
     for section, body in split_sections(text):
         paragraphs = [p.strip() for p in re.split(r"\n\s*\n|\n(?=\S)", body) if p.strip()]
@@ -84,4 +74,4 @@ def _split_long(paragraph: str, max_chars: int) -> list[str]:
 def embedding_text(opening_name: str, eco: str, section: str, text: str) -> str:
     """Texte réellement vectorisé : on préfixe le contexte pour qu'un passage
     isolé ("3...a6 forces White to...") reste rattaché à son ouverture."""
-    return f"{opening_name} ({eco}) — {section}\n{text}"
+    return f"{opening_name} ({eco}) : {section}\n{text}"

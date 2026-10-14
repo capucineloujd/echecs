@@ -18,7 +18,6 @@ from app.services.cache import Cache
 logger = logging.getLogger(__name__)
 
 QUOTA_KEY = "youtube:quota_blocked_until"
-# Mots trop génériques pour juger de la pertinence d'un titre
 GENERIC_WORDS = {"variation", "variante", "defense", "defence", "opening", "game", "partie", "line", "system"}
 
 
@@ -27,11 +26,6 @@ class YouTubeQuotaError(Exception):
 
 
 class YouTubeClient:
-    """Appels bruts à l'API YouTube Data v3 (bloquants, exécutés dans un thread).
-
-    Coût en quota : search.list = 100 unités, videos.list = 1 unité (quota : 10 000/jour).
-    """
-
     def __init__(self, api_key: str, timeout: float):
         self._api_key = api_key
         self._timeout = timeout
@@ -51,7 +45,7 @@ class YouTubeClient:
             maxResults=max_results,
             relevanceLanguage=language,
             videoEmbeddable="true",
-            safeSearch="strict",  # public de jeunes joueurs
+            safeSearch="strict",
         ).execute()
         return [item["id"]["videoId"] for item in response.get("items", [])]
 
@@ -65,7 +59,6 @@ class YouTubeClient:
 
 
 def parse_duration(iso: str) -> int:
-    """'PT1H2M3S' -> 3723 secondes."""
     match = re.fullmatch(r"P(?:(\d+)D)?T?(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?", iso or "")
     if not match:
         return 0
@@ -80,10 +73,8 @@ def format_duration(seconds: int) -> str:
 
 
 def relevance_terms(opening: str, info: OpeningInfo | None) -> list[str]:
-    """Expressions dont au moins une doit apparaître dans le titre de la vidéo."""
     if info:
         return [normalize(t) for t in info.search_terms]
-    # Ouverture hors catalogue (ex : nom renvoyé par Lichess "Sicilian Defense: Najdorf Variation")
     terms = []
     for part in re.split(r"[:,]", opening):
         words = [w for w in normalize(part).split() if w not in GENERIC_WORDS]
@@ -93,7 +84,6 @@ def relevance_terms(opening: str, info: OpeningInfo | None) -> list[str]:
 
 
 def next_quota_reset(now: datetime | None = None) -> datetime:
-    """Le quota YouTube est remis à zéro à minuit, heure du Pacifique."""
     pacific = ZoneInfo("America/Los_Angeles")
     now = (now or datetime.now(timezone.utc)).astimezone(pacific)
     tomorrow = (now + timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
@@ -113,8 +103,6 @@ class YouTubeService:
         self._lock = asyncio.Lock()
 
     async def find_videos(self, opening: str) -> VideosResponse:
-        # Ouverture du catalogue : recherche sur ses noms FR/EN. Sinon (variante Lichess
-        # "Sicilian Defense: Najdorf Variation") : recherche sur le nom exact, famille indiquée.
         info = self._catalog.exact(opening)
         family = info or self._catalog.detect(opening)
         label = info.name if info else opening
@@ -185,7 +173,6 @@ class YouTubeService:
                 video = self._to_video(item, language, terms, specific)
                 if video:
                     candidates[video.id] = video
-            # Assez de vidéos en français : on économise la deuxième recherche (100 unités)
             if len(candidates) >= wanted:
                 break
 
@@ -210,12 +197,12 @@ class YouTubeService:
         if snippet.get("liveBroadcastContent", "none") != "none":
             return None
         if not self._settings.youtube_min_duration_seconds <= duration <= self._settings.youtube_max_duration_seconds:
-            return None  # exclut les Shorts et les lives de plusieurs heures
+            return None
         if views < self._settings.youtube_min_views:
             return None
         normalized_title = f" {normalize(title)} "
         if not any(f" {t} " in normalized_title for t in terms):
-            return None  # le titre doit citer l'ouverture
+            return None
 
         language = (snippet.get("defaultAudioLanguage") or snippet.get("defaultLanguage") or search_language)[:2]
         likes = int(stats["likeCount"]) if "likeCount" in stats else None
@@ -241,11 +228,11 @@ class YouTubeService:
         )
 
     def _score(self, views: int, likes: int | None, language: str, channel_id: str) -> float:
-        score = math.log10(max(views, 1))  # 10k vues = 4, 1M = 6
+        score = math.log10(max(views, 1))
         if likes is not None and views:
-            score += min(likes / views * 20, 1.0)  # ~5 % de likes = bonus maximal
+            score += min(likes / views * 20, 1.0)
         if language == "fr":
-            score += 1.0  # public francophone
+            score += 1.0
         if channel_id in self._preferred:
             score += 2.0
         return round(score, 3)
@@ -254,7 +241,6 @@ class YouTubeService:
     def _rank(videos: list[Video], limit: int) -> list[Video]:
         ranked, per_channel = [], {}
         for video in sorted(videos, key=lambda v: v.score, reverse=True):
-            # Au plus 2 vidéos par chaîne, pour varier les points de vue
             if per_channel.get(video.channel_id, 0) >= 2:
                 continue
             per_channel[video.channel_id] = per_channel.get(video.channel_id, 0) + 1

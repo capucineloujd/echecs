@@ -8,8 +8,6 @@ logger = logging.getLogger(__name__)
 
 
 class EmbeddingService:
-    """Encapsule le modèle sentence-transformers (chargé une seule fois)."""
-
     def __init__(self, model_name: str, batch_size: int = 16, threads: int = 4, query_instruction: str = ""):
         logger.info("Chargement du modèle d'embedding %s", model_name)
         torch.set_num_threads(threads)
@@ -33,5 +31,4 @@ class EmbeddingService:
         return vector.tolist()
 
     async def aembed_query(self, query: str) -> list[float]:
-        # Calcul CPU bloquant : on le sort de la boucle asyncio
         return await asyncio.to_thread(self.embed_query, query)

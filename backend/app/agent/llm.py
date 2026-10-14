@@ -1,5 +1,3 @@
-"""Création du modèle de langage selon LLM_PROVIDER : le graphe et les outils n'en dépendent pas."""
-
 import logging
 
 from langchain_core.language_models import BaseChatModel
@@ -10,7 +8,6 @@ logger = logging.getLogger(__name__)
 
 
 def build_chat_model(settings: Settings) -> BaseChatModel | None:
-    """Modèle configuré, ou None si le fournisseur choisi n'est pas utilisable (clé absente)."""
     if settings.llm_provider == "ollama":
         from langchain_ollama import ChatOllama
 
@@ -20,7 +17,6 @@ def build_chat_model(settings: Settings) -> BaseChatModel | None:
             temperature=settings.llm_temperature,
             # Contexte par défaut d'Ollama trop court pour le prompt + les résultats d'outils
             num_ctx=settings.ollama_num_ctx,
-            # Mode « réflexion » de Qwen3 désactivé : réponses plus rapides, sans balises <think>
             reasoning=settings.ollama_reasoning,
             client_kwargs={"timeout": settings.llm_timeout_seconds},
         )

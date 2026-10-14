@@ -1,12 +1,3 @@
-"""Télécharge les articles d'ouvertures (Wikibooks Chess Opening Theory + Wikipédia FR).
-
-Usage (depuis la racine du projet) :
-    docker compose run --rm backend python -m scripts.fetch_wikichess
-
-Les articles sont écrits dans data/raw/<slug>.json et versionnés dans Git :
-l'ingestion fonctionne ensuite sans accès réseau.
-"""
-
 import json
 import sys
 import time
@@ -31,7 +22,6 @@ MAX_RETRIES = 4
 
 
 def get_with_retry(client: httpx.Client, url: str, params: dict) -> httpx.Response:
-    """GET avec réessais : respecte Retry-After sur 429, attente exponentielle sinon."""
     for attempt in range(MAX_RETRIES + 1):
         try:
             response = client.get(url, params=params)
@@ -76,7 +66,6 @@ def opening_fen(moves: str) -> str:
 
 def main() -> int:
     catalog = json.loads(CATALOG.read_text())
-    # Option --missing : ne télécharge que les ouvertures absentes de data/raw
     if "--missing" in sys.argv:
         catalog = [o for o in catalog if not (RAW_DIR / f"{o['slug']}.json").exists()]
     RAW_DIR.mkdir(parents=True, exist_ok=True)
@@ -97,7 +86,7 @@ def main() -> int:
                     {"source": source, "lang": lang, "title": title,
                      "url": page_url + title.replace(" ", "_"), "text": text}
                 )
-                time.sleep(2)  # politesse envers les serveurs Wikimedia
+                time.sleep(2)
 
             if len(documents) < len(SOURCES):
                 # On garde la version précédente plutôt que d'écrire un article incomplet

@@ -1,17 +1,13 @@
-# Python
 __pycache__/
 *.pyc
 .venv/
 venv/
 
-# Node/ Angular
 node_modules/
 dist/
 .angular/
 
-# Env
 .env
-
 
 .DS_Store
 .idea/

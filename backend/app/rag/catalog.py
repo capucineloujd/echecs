@@ -25,7 +25,6 @@ class OpeningInfo:
 
 
 def normalize(text: str) -> str:
-    """Minuscules, sans accents ni ponctuation : "Défense Caro-Kann" -> "defense caro kann"."""
     text = unicodedata.normalize("NFKD", text).encode("ascii", "ignore").decode()
     return re.sub(r"[^a-z0-9]+", " ", text.lower()).strip()
 
@@ -55,7 +54,6 @@ class OpeningCatalog:
         return cls(openings)
 
     def exact(self, slug_or_name: str) -> OpeningInfo | None:
-        """Correspondance exacte (slug, nom ou alias), sans recherche dans une phrase."""
         if slug_or_name in self.openings:
             return self.openings[slug_or_name]
         wanted = normalize(slug_or_name)
@@ -65,7 +63,6 @@ class OpeningCatalog:
         return self.openings.get(slug_or_name) or self.detect(slug_or_name)
 
     def detect(self, query: str) -> OpeningInfo | None:
-        """Trouve l'ouverture citée dans une question en langage naturel."""
         padded = f" {normalize(query)} "
         for alias, opening in self._aliases:
             if f" {alias} " in padded:

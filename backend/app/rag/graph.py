@@ -1,14 +1,3 @@
-"""Graphe LangGraph de recherche documentaire sur les ouvertures.
-
-                  ┌──► find_videos ─────────────────────────► END
-    detect_opening┤
-                  └──► retrieve ──┬──► format_results ──► END
-                          ▲       │
-                          └─ widen_search (si le filtre par ouverture ne donne rien)
-
-Les deux branches s'exécutent en parallèle.
-"""
-
 from typing import TYPE_CHECKING, TypedDict
 
 from langgraph.graph import END, START, StateGraph
@@ -25,7 +14,7 @@ if TYPE_CHECKING:
 
 class RagState(TypedDict, total=False):
     query: str
-    opening: str | None  # ouverture demandée explicitement (slug ou nom)
+    opening: str | None
     top_k: int
     min_score: float
     include_videos: bool
@@ -81,9 +70,8 @@ def build_rag_graph(
             if len(results) == state["top_k"]:
                 break
 
-        # Contexte prêt à être injecté dans le prompt d'un LLM (étape suivante)
         context = "\n\n".join(
-            f"[{i}] {r['opening_name']} ({r['eco']}) — {r['section']} — source : {r['url']}\n{r['text']}"
+            f"[{i}] {r['opening_name']} ({r['eco']}), {r['section']}, source : {r['url']}\n{r['text']}"
             for i, r in enumerate(results, start=1)
         )
         return {"results": results, "context": context}

@@ -41,8 +41,6 @@ Texte simple : pas de titres, pas de tableaux, pas de liste numérotée."""
 
 
 def describe_position(fen: str, moves: list[str], question: str | None) -> str:
-    """Message utilisateur : la position sous plusieurs formes, comme dans l'étude Kaggle Game Arena
-    (FEN + historique des coups + diagramme), pour limiter les erreurs de lecture du LLM."""
     board = chess.Board(fen)
     history = " ".join(
         f"{i // 2 + 1}.{san}" if i % 2 == 0 else san for i, san in enumerate(moves)

@@ -1,11 +1,3 @@
-"""Outils de l'agent.
-
-- La FEN vient de l'état du graphe (InjectedState) et non des arguments du LLM :
-  il ne peut pas la recopier de travers.
-- Les résultats sont pré-interprétés (évaluation en mots, bilan matériel des lignes,
-  nom français de l'ouverture) : un petit modèle local n'a pas à faire de calcul.
-"""
-
 from typing import TYPE_CHECKING, Annotated
 
 import chess
@@ -30,7 +22,6 @@ def side(color: chess.Color) -> str:
 
 
 def describe_score(score: Score) -> str:
-    """Évaluation Stockfish (point de vue des Blancs) traduite en mots."""
     if score.mate is not None:
         if score.mate == 0:
             return "échec et mat"
@@ -57,7 +48,6 @@ def material(board: chess.Board) -> int:
 
 
 def material_outcome(board: chess.Board, pv_san: list[str]) -> str:
-    """Bilan matériel au bout d'une ligne : rend visibles les pièges qui gagnent une pièce."""
     end = board.copy(stack=False)
     for san in pv_san:
         end.push_san(san)
@@ -67,7 +57,6 @@ def material_outcome(board: chess.Board, pv_san: list[str]) -> str:
     if abs(delta) < 1:
         return "matériel égal"
     winner = "Blancs" if delta > 0 else "Noirs"
-    # Ex. 4 = une pièce et un pion : on donne la valeur totale, en précisant l'échelle
     gain = GAIN_NAMES.get(abs(delta), f"du matériel valant {abs(delta)} pions (Cavalier/Fou = 3, Tour = 5, Dame = 9)")
     return f"les {winner} gagnent {gain}"
 
@@ -86,7 +75,6 @@ def format_engine(board: chess.Board, evaluation: Evaluation) -> str:
         )
     mate = evaluation.score.mate
     if mate and (mate > 0) == (board.turn == chess.WHITE) and evaluation.lines:
-        # Le camp au trait a un mat : les autres suites ne sont que du bruit pour l'élève
         lines.append(f"Il y a un mat : seul le coup {evaluation.lines[0].pv_san[0]} compte.")
     return "\n".join(lines)
 
@@ -171,7 +159,7 @@ def build_tools(
         if not state["results"]:
             return "Aucun passage pertinent trouvé."
         return "\n\n".join(
-            f"[{r['source']} — {r['opening_name']} — {r['section']}]\n{r['text'][:MAX_PASSAGE_CHARS]}"
+            f"[{r['source']}, {r['opening_name']}, {r['section']}]\n{r['text'][:MAX_PASSAGE_CHARS]}"
             for r in state["results"]
         )
 

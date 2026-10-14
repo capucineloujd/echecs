@@ -12,13 +12,6 @@ logger = logging.getLogger(__name__)
 
 
 class PositionAnalysisService:
-    """Choisit la source d'information adaptée à une position.
-
-    - Position connue (au moins `theory_min_games` parties) : coups théoriques Lichess.
-    - Hors théorie, ou Lichess indisponible : évaluation Stockfish.
-    Utilisé par la route /moves et par l'outil correspondant de l'agent.
-    """
-
     def __init__(self, settings: Settings, lichess: LichessExplorerService, stockfish: StockfishService):
         self._settings = settings
         self._lichess = lichess

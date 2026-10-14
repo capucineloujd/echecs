@@ -16,7 +16,7 @@ E4_RESPONSE = {
     "moves": [
         {"uci": "c7c5", "san": "c5", "white": 300, "draws": 150, "black": 50, "averageRating": 2450},
         {"uci": "e7e5", "san": "e5", "white": 300, "draws": 150, "black": 50, "averageRating": 2440},
-        {"uci": "e2e4", "san": "e4", "white": 1, "draws": 0, "black": 0},  # illégal : doit être ignoré
+        {"uci": "e2e4", "san": "e4", "white": 1, "draws": 0, "black": 0},
     ],
 }
 
@@ -26,7 +26,6 @@ def board():
     b = chess.Board()
     b.push_san("e4")
     return b
-
 
 
 @pytest.fixture
@@ -46,8 +45,6 @@ async def test_parses_moves_and_drops_illegal(service, board):
     assert route.calls[0].request.headers["Authorization"] == "Bearer test"
 
 
-
-
 @respx.mock
 async def test_uses_cache(service, board):
     route = respx.get(f"{URL}/masters").mock(return_value=httpx.Response(200, json=E4_RESPONSE))
@@ -65,7 +62,6 @@ async def test_rate_limit_blocks_following_requests(service, board):
         await service.get_theory_moves(board)
     assert exc.value.retry_after == 60
 
-    # Pendant la pause, on ne rappelle pas Lichess du tout
     with pytest.raises(LichessRateLimitError):
         await service.get_theory_moves(chess.Board())
     assert route.call_count == 1

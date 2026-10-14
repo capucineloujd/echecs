@@ -10,8 +10,6 @@ logger = logging.getLogger(__name__)
 
 
 class StockfishService:
-    """Garde un processus Stockfish ouvert et sérialise les analyses"""
-
     def __init__(self, settings: Settings):
         self._settings = settings
         self._engine: chess.engine.UciProtocol | None = None

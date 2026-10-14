@@ -1,11 +1,3 @@
-"""Découpe les articles de data/raw, calcule les embeddings et les indexe dans Milvus.
-
-Usage (depuis la racine du projet, Milvus démarré) :
-    docker compose run --rm backend python -m scripts.ingest
-
-Rejouable : la collection est recréée à chaque exécution.
-"""
-
 import json
 import sys
 import time

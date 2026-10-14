@@ -11,7 +11,6 @@ from app.schemas import Opening, TheoryMove
 logger = logging.getLogger(__name__)
 
 
-
 class ExplorerResult:
     def __init__(self, opening: Opening | None, total_games: int, moves: list[TheoryMove]):
         self.opening = opening
@@ -20,8 +19,6 @@ class ExplorerResult:
 
 
 class LichessExplorerService:
-    """Client de l'Opening Explorer Lichess."""
-
     def __init__(self, settings: Settings, client: httpx.AsyncClient | None = None):
         self._settings = settings
         headers = {"Accept": "application/json"}
@@ -98,7 +95,6 @@ class LichessExplorerService:
     def _parse(board: chess.Board, data: dict) -> ExplorerResult:
         moves = []
         for m in data.get("moves", []):
-            # On ne fait pas confiance aveuglément à l'API : chaque coup est revalidé
             san = uci_to_san(board, m.get("uci", ""))
             if san is None:
                 logger.warning("Coup illégal ignoré depuis Lichess : %s", m.get("uci"))

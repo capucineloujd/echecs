@@ -22,12 +22,10 @@ async def test_starting_position_is_balanced(engine):
     assert evaluation.best_move_san
 
 async def test_score_is_from_white_point_of_view(engine):
-    # les Blancs ont une dame de +, trait aux Noirs : le score doit rester positif
     board = chess.Board("4k3/8/8/8/8/8/8/3QK3 b - - 0 1")
     evaluation = await engine.evaluate(board)
     assert evaluation.side_to_move == "black"
     assert evaluation.score.mate is not None and evaluation.score.mate > 0 or evaluation.score.centipawns > 500
-
 
 
 async def test_mate_in_one(engine):

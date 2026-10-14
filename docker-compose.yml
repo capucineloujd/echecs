@@ -1,4 +1,4 @@
-# Nom de projet fixe : volumes (echecs_*) et images (echecs-*) identiques quel que soit le nom du dossier cloné
+# Nom fixe : volumes et images ne dépendent pas du nom du dossier cloné
 name: echecs
 
 services:
@@ -10,7 +10,7 @@ services:
     ports:
       - "${FRONTEND_HOST_PORT:-4200}:80"
     depends_on:
-      # Démarre sans attendre que le modèle d'embeddings soit chargé : l'interface affiche les erreurs en attendant
+      # Pas d'attente du healthcheck : l'interface affiche les erreurs pendant le chargement du modèle
       - backend
     restart: unless-stopped
 
@@ -22,7 +22,7 @@ services:
       BACKEND_PORT: ${BACKEND_PORT:-8000}
       MILVUS_URI: http://milvus:19530
       MONGO_URI: mongodb://mongodb:27017
-    # Accès à Ollama lancé sur la machine hôte (déjà défini par Docker Desktop, nécessaire sous Linux)
+    # Ollama tourne sur l'hôte ; nécessaire sous Linux, Docker Desktop le définit déjà
     extra_hosts:
       - "host.docker.internal:host-gateway"
     ports:

@@ -15,8 +15,6 @@ class Cache(Protocol):
 
 
 class MemoryCache:
-    """Cache en mémoire : pour les tests, et en secours si MongoDB est injoignable."""
-
     def __init__(self):
         self._data: dict[str, tuple[float, Any]] = {}
 
@@ -31,12 +29,6 @@ class MemoryCache:
 
 
 class MongoCache:
-    """Cache clé/valeur dans MongoDB, avec expiration automatique (index TTL).
-
-    Survit aux redémarrages de l'API : indispensable pour économiser le quota YouTube.
-    Si MongoDB tombe, on bascule sur un cache mémoire plutôt que de bloquer l'API.
-    """
-
     def __init__(self, uri: str, db_name: str, collection: str = "api_cache"):
         self._client = AsyncMongoClient(uri, serverSelectionTimeoutMS=3000)
         self._collection = self._client[db_name][collection]

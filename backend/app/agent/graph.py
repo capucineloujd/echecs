@@ -1,26 +1,11 @@
-"""Agent coach : LangGraph, le LLM choisit ses outils.
-
-    START ──► read_position ──► tools ──► decide ──(outil choisi)──► tools ──┐
-                                            ▲  └──(« répondre »)──► answer ──► END
-                                            └─────────────────────────────────┘
-
-- read_position : la lecture de la position (get_position_moves : théorie Lichess ou
-  Stockfish) est garantie au départ.
-- decide : à chaque tour, le LLM DOIT choisir explicitement (sortie structurée) un outil
-  ou « répondre ». Plus fiable qu'un appel d'outil facultatif avec un petit modèle local,
-  qui a tendance à répondre sans vérifier.
-- answer : le LLM rédige le conseil (streamé) à partir des résultats d'outils.
-- Au-delà de `max_steps` décisions, ou si un outil est redemandé à l'identique : réponse.
-"""
-
 import logging
 from typing import Any, Literal
 
+from langchain_core.exceptions import OutputParserException
 from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
 from langgraph.graph import END, START, MessagesState, StateGraph
 from langgraph.prebuilt import ToolNode
-from langchain_core.exceptions import OutputParserException
 from pydantic import BaseModel, Field, ValidationError
 
 from app.agent.prompts import ANSWER_PROMPT, DECISION_PROMPT, describe_position
@@ -28,7 +13,6 @@ from app.agent.prompts import ANSWER_PROMPT, DECISION_PROMPT, describe_position
 logger = logging.getLogger(__name__)
 
 FIRST_TOOL = "get_position_moves"
-# Argument attendu par chaque outil que le LLM peut choisir
 TOOL_ARGUMENTS = {"evaluate_position": "move_san", "search_opening_knowledge": "query", "find_videos": "opening"}
 
 
@@ -65,7 +49,6 @@ def build_agent_graph(model: BaseChatModel, tools: list, max_steps: int = 4):
         try:
             decision: Decision = await decider.ainvoke([SystemMessage(DECISION_PROMPT), *state["messages"]])
         except (OutputParserException, ValidationError) as exc:
-            # Décision illisible (JSON invalide) : on répond avec ce qu'on a plutôt que d'échouer
             logger.warning("Décision de l'agent illisible, passage à la réponse : %s", exc)
             return {"ready": True, "steps": steps + 1}
         if decision is None or decision.tool == "answer":
@@ -104,8 +87,7 @@ def build_agent_graph(model: BaseChatModel, tools: list, max_steps: int = 4):
 
 
 def _reminder(state: AgentState) -> HumanMessage:
-    """Rappel placé en dernier (là où un petit modèle est le plus attentif) : les faits
-    établis par l'analyse de départ, que la réponse ne doit pas contredire."""
+    """Placé en dernier : c'est la fin du contexte qu'un petit modèle suit le mieux."""
     analysis = next((m.content for m in state["messages"] if isinstance(m, ToolMessage)), "")
     facts = [line for line in analysis.splitlines() if line.startswith(("Source choisie", "Ouverture", "Coup de référence"))]
     in_theory = analysis.startswith("Source choisie : théorie")
@@ -119,8 +101,7 @@ def _reminder(state: AgentState) -> HumanMessage:
 
 
 def _as_text(messages: list) -> list:
-    """Pour la rédaction, les appels d'outils deviennent du texte simple : le modèle n'a plus
-    d'outils à ce stade, et certains refusent un historique d'appels sans outils déclarés."""
+    """Certains modèles refusent un historique d'appels d'outils quand aucun outil n'est déclaré."""
     converted = []
     for message in messages:
         if isinstance(message, ToolMessage):

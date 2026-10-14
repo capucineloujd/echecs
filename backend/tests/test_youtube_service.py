@@ -16,7 +16,6 @@ from app.services.youtube import (
 )
 
 
-
 def item(vid, title, views=50_000, likes=2_000, duration="PT12M30S", channel="c1", lang="fr", embeddable=True,
          live="none"):
     return {
@@ -106,7 +105,7 @@ async def test_ranking_prefers_french_and_limits_per_channel(catalog):
     ]})
     result = await service(catalog, client, youtube_max_videos=5).find_videos("italienne")
     ids = [v.id for v in result.videos]
-    assert ids[0] == "b"  # bonus francophone
+    assert ids[0] == "b"
     assert sum(v.channel_id == "z" for v in result.videos) == 2
     assert "e" not in ids
 
@@ -140,7 +139,7 @@ async def test_quota_exceeded_blocks_next_calls(catalog):
     client.error = None
     second = await svc.find_videos("italienne")
     assert second.status == "quota_exceeded"
-    assert len(client.searches) == 1  # plus aucun appel tant que le quota n'est pas remis à 0
+    assert len(client.searches) == 1
 
 
 async def test_network_error_is_unavailable(catalog):
@@ -161,9 +160,7 @@ async def test_opening_outside_catalog(catalog):
                                 item("sic", "The Sicilian Defense", channel="d", views=900_000),
                                 item("n3", "Comment gagner aux échecs", channel="c")]})
     result = await service(catalog, client).find_videos("Sicilian Defense: Najdorf Variation")
-    # Les vidéos sur la variante passent devant une vidéo générale bien + vue
     assert [v.id for v in result.videos][:2] == ["n1", "n2"] and "sic" in {v.id for v in result.videos}
-    # La recherche porte sur la variante, la famille reste indiquée
     assert "Sicilian Defense: Najdorf Variation" in client.searches[0][1]
     assert result.opening_slug == "sicilienne"
 

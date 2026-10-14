@@ -36,7 +36,7 @@ async def lifespan(app: FastAPI):
     try:
         await app.state.stockfish.start()
     except EngineError as exc:
-        # L'API démarre quand mm : le moteur sera relancé à la 1ere requête
+        # L'API démarre quand même : le moteur sera relancé à la première requête
         logger.error("%s", exc)
     app.state.cache = MongoCache(settings.mongo_uri, settings.mongo_db)
     app.state.catalog = catalog = OpeningCatalog.load()

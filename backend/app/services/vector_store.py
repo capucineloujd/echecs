@@ -7,15 +7,12 @@ from app.core.errors import VectorStoreError
 
 logger = logging.getLogger(__name__)
 
-# Code d'erreur Milvus « collection not found »
 COLLECTION_NOT_FOUND = 100
 
 OUTPUT_FIELDS = ["opening_slug", "opening_name", "eco", "fen", "section", "source", "lang", "url", "text"]
 
 
 class VectorStoreService:
-    """Accès à la collection Milvus des passages d'ouvertures."""
-
     def __init__(self, uri: str, collection: str):
         self._uri = uri
         self._collection = collection
@@ -31,7 +28,6 @@ class VectorStoreService:
         return self._client
 
     def recreate_collection(self, dimension: int) -> None:
-        """Supprime puis recrée la collection : l'ingestion est rejouable sans doublons."""
         if self.client.has_collection(self._collection):
             self.client.drop_collection(self._collection)
 
@@ -49,7 +45,6 @@ class VectorStoreService:
         schema.add_field("text", DataType.VARCHAR, max_length=8192)
 
         index = MilvusClient.prepare_index_params()
-        # Vecteurs normalisés : produit scalaire = cosinus. HNSW suffit largement ici.
         index.add_index("vector", index_type="HNSW", metric_type="COSINE", params={"M": 16, "efConstruction": 200})
         index.add_index("opening_slug", index_type="INVERTED")
 
@@ -76,7 +71,6 @@ class VectorStoreService:
             )
         except MilvusException as exc:
             if exc.code == COLLECTION_NOT_FOUND:
-                # Cas typique d'une installation fraîche : l'ingestion n'a pas encore été lancée
                 raise VectorStoreError(
                     f"Collection '{self._collection}' absente : lancer l'ingestion (python -m scripts.ingest, voir README)"
                 ) from exc

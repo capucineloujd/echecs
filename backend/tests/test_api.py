@@ -116,7 +116,7 @@ class FakeGraph:
                  "fen": "", "section": "Histoire", "source": "wikipedia_fr", "lang": "fr",
                  "url": "https://fr.wikipedia.org/wiki/Partie_espagnole", "text": "Ruy López de Segura..."}
             ],
-            "context": "[1] Partie espagnole (C60) — Histoire",
+            "context": "[1] Partie espagnole (C60), Histoire",
         }
 
 

@@ -64,7 +64,7 @@ build sans cache) le 13/10/2026.
 | Docker | Docker Desktop (ou Engine ≥ 25) avec Compose v2.20+ (`docker compose version`) |
 | Mémoire Docker | **12 Go minimum** (Docker Desktop → Settings → Resources → Memory) : le modèle d'embedding, Milvus et MongoDB tournent ensemble |
 | Disque | ~8 Go : images (~5,5 Go) + modèle d'embedding (1,2 Go) + données |
-| Ports libres | 4200 (interface), 8000 (API), 27017 (MongoDB), 19530 (Milvus) — modifiables, voir [Ports](#ports) |
+| Ports libres | 4200 (interface), 8000 (API), 27017 (MongoDB), 19530 (Milvus), modifiables, voir [Ports](#ports) |
 | Token Lichess | Obligatoire : lichess.org → Préférences → Accès API → token **sans aucune permission** |
 | Ollama | Pour le conseil du coach (sans Ollama, le reste de l'application fonctionne). Installé **sur la machine**, hors Docker : voir l'étape 2 |
 | Clé YouTube | Facultative (sans clé, le panneau vidéos propose un lien de recherche) : Google Cloud Console → activer *YouTube Data API v3* → Identifiants → Clé API |

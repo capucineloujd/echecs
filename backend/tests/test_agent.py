@@ -22,8 +22,6 @@ SPANISH = "r1bqkbnr/pppp1ppp/2n5/1B2p3/4P3/5N2/PPPP1PPP/RNBQK2R b KQkq - 3 3"
 
 
 class ScriptedModel(BaseChatModel):
-    """Faux LLM : décisions (sortie structurée) et réponses rédigées prévues à l'avance."""
-
     messages: object
     decisions: object = iter([])
     seen: list = []
@@ -91,11 +89,9 @@ async def test_position_is_always_read_before_the_llm_answers():
     events = await collect(graph)
 
     assert [e["event"] for e in events if e["event"] != "token"] == ["tool_start", "tool_end", "done"]
-    # L'outil a reçu la FEN de l'état, pas une FEN recopiée par le LLM
     assert FakeAnalysis.calls == [chess.Board(SPANISH).fen()]
     assert "".join(e["text"] for e in events if e["event"] == "token") == "Joue a6, le coup le plus courant."
     assert events[-1]["tools_used"] == ["get_position_moves"]
-    # Dès sa première décision, le LLM voit l'analyse, avec le nom français de l'ouverture
     assert "Partie espagnole (Ruy Lopez)" in ScriptedModel.decision_inputs[0][-1].content
 
 
@@ -206,7 +202,6 @@ def test_format_moves_out_of_theory_mentions_stockfish():
 
 
 def test_material_outcome_reveals_the_elephant_trap():
-    # Piège de l'éléphant : après 6.Nxd5?? Nxd5 7.Bxd8 Bb4+ 8.Qd2 Bxd2+ 9.Kxd2 Kxd8, les Noirs ont gagné une pièce
     board = chess.Board("r1bqkb1r/pppn1ppp/5n2/3N2B1/3P4/8/PP2PPPP/R2QKBNR b KQkq - 0 6")
     assert material_outcome(board, "Nxd5 Bxd8 Bb4+ Qd2 Bxd2+ Kxd2 Kxd8".split()) == (
         "les Noirs gagnent une pièce (Cavalier ou Fou)"
