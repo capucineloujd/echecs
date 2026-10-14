@@ -3,6 +3,7 @@ import { ChessBoardComponent } from './board/chess-board.component';
 import { CoachStore } from './core/coach.store';
 import { describeScore, formatScore, whiteShare } from './core/format';
 import { GameStore } from './core/game.store';
+import { CoachAdviceComponent } from './panel/coach-advice.component';
 import { MoveListComponent } from './panel/move-list.component';
 import { OpeningContextComponent } from './panel/opening-context.component';
 import { SuggestionsComponent } from './panel/suggestions.component';
@@ -10,7 +11,7 @@ import { VideosComponent } from './panel/videos.component';
 
 @Component({
   selector: 'app-root',
-  imports: [ChessBoardComponent, MoveListComponent, SuggestionsComponent, OpeningContextComponent, VideosComponent],
+  imports: [ChessBoardComponent, MoveListComponent, SuggestionsComponent, CoachAdviceComponent, OpeningContextComponent, VideosComponent],
   templateUrl: './app.html',
   styleUrl: './app.scss',
   host: {

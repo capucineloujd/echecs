@@ -10,3 +10,4 @@ langgraph==1.2.14
 google-api-python-client==2.201.0
 pymongo==4.18.3
 tzdata==2026.5
+langchain-mistralai==1.1.6

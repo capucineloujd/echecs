@@ -71,6 +71,7 @@
 
   <aside class="panel" aria-label="Recommandations de l'agent">
     <app-suggestions [state]="coach.moves()" [gameOver]="game.gameOver()" (play)="onPlay($event)" (retry)="coach.retryMoves()" />
+    <app-coach-advice />
     <app-opening-context [state]="coach.context()" [openingName]="coach.openingName()" (retry)="coach.retryContext()" />
     <app-videos [state]="coach.videos()" [canSearch]="coach.canSearchVideos()" (search)="coach.searchVideos()" />
   </aside>

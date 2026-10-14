@@ -26,7 +26,7 @@ export function toApiError(err: unknown): ApiError {
     if (err.status === 0) {
       return { status: 0, message: 'Serveur injoignable : vérifie ta connexion ou que le backend est démarré.', retryAfter: null };
     }
-    const detail = typeof err.error?.detail === 'string' ? err.error.detail : null;
+    const detail = errorDetail(err.error);
     const retryAfter = Number(err.headers.get('Retry-After')) || null;
     if (!detail && [502, 503, 504].includes(err.status)) {
       // Réponse du proxy nginx (backend arrêté ou en train de charger le modèle)
@@ -35,6 +35,19 @@ export function toApiError(err: unknown): ApiError {
     return { status: err.status, message: detail ?? `Erreur ${err.status}`, retryAfter };
   }
   return { status: -1, message: 'Erreur inattendue.', retryAfter: null };
+}
+
+/** Champ `detail` de FastAPI ; le corps est une chaîne quand la requête attend du texte (flux SSE) */
+function errorDetail(body: unknown): string | null {
+  if (typeof body === 'string') {
+    try {
+      body = JSON.parse(body);
+    } catch {
+      return null;
+    }
+  }
+  const detail = (body as { detail?: unknown } | null)?.detail;
+  return typeof detail === 'string' ? detail : null;
 }
 
 /** Transforme un appel HTTP en flux d'états : loading, puis ok ou error (sans jamais casser le flux parent) */

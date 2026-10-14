@@ -1,6 +1,7 @@
 # Coach d'ouvertures d'échecs 
 
-L'agent guide le joueur à partir de la position courante en combinant :
+L'agent (LLM Mistral orchestré par LangGraph) analyse la position courante,
+choisit lui-même ses sources et rédige un conseil adapté à un jeune joueur, en combinant :
 - la théorie des ouvertures (API Lichess Opening Explorer) ;
 - le contexte historique (Wikibooks Chess Opening Theory, indexé dans Milvus) ;
 - des vidéos explicatives (YouTube Data API) ;
@@ -11,7 +12,7 @@ L'agent guide le joueur à partir de la position courante en combinant :
 | Couche | Technologies |
 |---|---|
 | Frontend | Angular 22, ngx-chess-board, chess.js, nginx |
-| Backend | FastAPI, LangGraph |
+| Backend | FastAPI, LangGraph, Mistral (langchain-mistralai) |
 | Données | MongoDB, Milvus |
 | Moteur | Stockfish |
 | Orchestration | Docker Compose |
@@ -27,8 +28,10 @@ L'agent guide le joueur à partir de la position courante en combinant :
 │   │   ├── schemas.py      modèles de réponse (Pydantic)
 │   │   ├── api/v1/         routes versionnées (healthcheck, moves, evaluate, openings, vector-search, videos)
 │   │   ├── core/           validation FEN (python-chess), erreurs métier
-│   │   ├── rag/            découpage, catalogue des ouvertures, graphe LangGraph
-│   │   └── services/       Lichess, Stockfish, embeddings, Milvus, YouTube, cache MongoDB
+│   │   ├── agent/          agent coach : outils, prompt, graphe LangGraph (tool calling), streaming
+│   │   ├── rag/            découpage, catalogue des ouvertures, graphe LangGraph de recherche
+│   │   └── services/       logique métier : analyse de position (théorie ou moteur), Lichess,
+│   │                       Stockfish, embeddings, Milvus, YouTube, cache MongoDB
 │   ├── scripts/            fetch_wikichess.py (collecte), ingest.py (indexation Milvus)
 │   ├── data/               catalogue des ouvertures + articles bruts (data/raw)
 │   ├── tests/              tests pytest (services externes simulés, Stockfish réel)
@@ -39,7 +42,7 @@ L'agent guide le joueur à partir de la position courante en combinant :
 │   ├── src/app/
 │   │   ├── core/           services HTTP, état de la partie (GameStore), recommandations (CoachStore)
 │   │   ├── board/          enveloppe de ngx-chess-board
-│   │   └── panel/          coups suggérés, fiche de l'ouverture, vidéos, liste des coups
+│   │   └── panel/          coups suggérés, conseil du coach, fiche de l'ouverture, vidéos, coups joués
 │   ├── nginx/              config nginx (fichiers statiques + proxy /api vers le backend)
 │   ├── proxy.conf.json     proxy /api pour `npm start` en développement
 │   └── Dockerfile          build Node 24.18.1, service nginx 1.30.0
@@ -62,6 +65,7 @@ build sans cache) le 13/10/2026.
 | Disque | ~8 Go : images (~5,5 Go) + modèle d'embedding (1,2 Go) + données |
 | Ports libres | 4200 (interface), 8000 (API), 27017 (MongoDB), 19530 (Milvus) — modifiables, voir [Ports](#ports) |
 | Token Lichess | Obligatoire : lichess.org → Préférences → Accès API → token **sans aucune permission** |
+| Clé Mistral | Obligatoire pour le conseil du coach (sans clé, le reste de l'application fonctionne) : console.mistral.ai → API Keys |
 | Clé YouTube | Facultative (sans clé, le panneau vidéos propose un lien de recherche) : Google Cloud Console → activer *YouTube Data API v3* → Identifiants → Clé API |
 
 ### 1. Configurer
@@ -71,6 +75,7 @@ Créer un fichier `.env` à la racine (il n'est pas versionné) :
 ```bash
 cat > .env <<EOF
 LICHESS_TOKEN=lip_xxxxxxxx
+MISTRAL_API_KEY=xxxxxxxx
 YOUTUBE_API_KEY=AIza...
 EOF
 ```
@@ -135,6 +140,7 @@ La FEN se passe directement dans l'URL. Les espaces peuvent être encodés
 | `GET /api/v1/evaluate/{fen}?depth=18&multipv=3` | Évaluation Stockfish : score en centipawns (ou mat en N) du point de vue des Blancs, meilleur coup, meilleures lignes |
 | `GET /api/v1/openings` | Ouvertures du catalogue (slug, nom, ECO, coups, FEN), pour le menu de l'interface |
 | `GET /api/v1/vector-search?query=...&opening=...&top_k=5&videos=true` | Recherche vectorielle dans les articles d'ouvertures (Milvus). Renvoie les passages les plus pertinents avec leur source, un champ `context` prêt pour un LLM et, si une ouverture est reconnue, des vidéos YouTube. |
+| `POST /api/v1/agent/analyze` | Conseil du coach en streaming (SSE). Corps : `{"fen": "...", "moves": ["e4", "e5"], "question": "et si je joue Nxd5 ?"}` (`moves` et `question` facultatifs). Événements `tool_start`, `tool_end`, `token`, puis `done` ou `error`. |
 | `GET /api/v1/videos/{opening}` | Vidéos YouTube explicatives pour une ouverture (slug `espagnole`, nom `Défense Caro-Kann` ou nom de variante Lichess `Sicilian Defense: Najdorf Variation`). |
 
 Exemple :
@@ -301,6 +307,68 @@ après `detect_opening` :
                           └─ widen_search
 ```
 
+## Agent coach (Mistral + LangGraph)
+
+### Graphe (`app/agent/graph.py`)
+
+```
+    START ──► agent ──(appels d'outils ?)──► tools ──┐
+                ▲  └──(réponse finale)──► END       │
+                └───────────────────────────────────┘
+```
+
+Boucle ReAct : le nœud `agent` appelle Mistral (`mistral-small-latest`) avec
+les outils ; tant que le modèle demande des outils, `tools` les exécute
+(`ToolNode` de LangGraph) et renvoie les résultats au modèle. Au-delà de
+`AGENT_MAX_STEPS` tours, le modèle est rappelé **sans outils** et doit conclure.
+
+### Outils : l'agent choisit ses sources
+
+| Outil | Source | Quand le LLM l'utilise (consigne du prompt) |
+|---|---|---|
+| `get_position_moves` | `PositionAnalysisService` : Lichess si la position est dans la théorie, sinon Stockfish | Toujours en premier : savoir où on en est |
+| `evaluate_position(move_san?)` | Stockfish, sur la position ou après un coup | Vérifier un coup précis (« et si je joue Nxd5 ? ») ou dire qui est mieux |
+| `search_opening_knowledge(query)` | Graphe RAG (Milvus) | Expliquer les idées, plans, pièges d'une ouverture identifiée |
+| `find_videos(opening)` | YouTube | Seulement si l'élève demande des vidéos (quota) |
+
+Comportement attendu d'après le prompt : « que jouer ? » dans l'espagnole →
+théorie puis articles ; « et si je joue Nxd5 ? » → théorie puis Stockfish sur Nxd5.
+
+Choix de conception :
+- **La FEN ne passe pas par le LLM** : les outils la lisent dans l'état du
+  graphe (`InjectedState`). Le modèle ne peut pas la recopier de travers.
+- **Position décrite sous trois formes** dans le message (FEN, coups joués,
+  diagramme ASCII), comme dans l'étude Kaggle Game Arena : les LLM lisent mal
+  une FEN seule.
+- **Le LLM ne calcule pas** : le prompt lui interdit de proposer un coup absent
+  des résultats d'outils ; les évaluations viennent de Stockfish.
+- **Erreur d'outil** (Lichess en panne...) : renvoyée au LLM comme résultat
+  (`handle_tool_errors`), qui peut s'appuyer sur un autre outil.
+- **Réponse** : français, tutoiement, 120 mots max, en trois temps (où on en
+  est, coup conseillé et pourquoi, idée à retenir), sources citées.
+
+### Logique métier séparée de l'API
+
+La décision « théorie ou moteur » (seuil `THEORY_MIN_GAMES`, repli sur
+Stockfish si Lichess est indisponible) est dans
+`services/position_analysis.py`, utilisée à la fois par la route `/moves`
+(qui ne fait plus que valider la FEN et déléguer) et par l'outil
+`get_position_moves` de l'agent.
+
+### Streaming et erreurs
+
+`POST /agent/analyze` renvoie un flux SSE : l'interface affiche les outils
+consultés puis le texte au fil de l'eau. L'en-tête `X-Accel-Buffering: no`
+empêche nginx de bufferiser le flux.
+
+| Cas | Comportement |
+|---|---|
+| Pas de `MISTRAL_API_KEY` | `503` « Coach indisponible » ; le reste de l'application fonctionne |
+| FEN invalide | `422` avant l'ouverture du flux |
+| Clé invalide, limite Mistral (429), Mistral injoignable | Événement `error` avec un message lisible (2 nouvelles tentatives automatiques avant) |
+| Réponse trop longue | Timeout global `AGENT_TIMEOUT_SECONDS` → événement `error` |
+| L'élève change de position pendant la réponse | La requête est annulée, le conseil effacé |
+
 ## Interface Angular
 
 ### Choix techniques
@@ -354,6 +422,15 @@ après `detect_opening` :
 | Contexte par ouverture | `/vector-search` n'est appelé que quand le nom d'ouverture change, pas à chaque coup ; le nom reste affiché hors théorie |
 | Vidéos à la demande | Pour une ouverture hors catalogue (ex. « King's Pawn Game »), bouton « Chercher des vidéos » au lieu d'un appel automatique qui consommerait le quota YouTube |
 | Stockfish optionnel | `/evaluate` n'est appelé que si « Évaluation Stockfish » est cochée |
+
+### Conseil du coach
+
+Panneau « Conseil du coach » : champ de question facultatif et bouton
+« Demander au coach ». L'agent n'est appelé **qu'à la demande** (pas à chaque
+coup) : un appel LLM coûte du temps et de l'argent. `AgentService` lit le flux
+SSE avec `HttpClient` (backend `fetch`, événements `DownloadProgress`), et
+`AdviceStore` affiche les outils consultés (⏳ puis ✓) et le texte au fil de
+l'eau. Bouton « Arrêter » pendant la réponse.
 
 ### Chargement et erreurs
 
@@ -456,10 +533,13 @@ curl -s "localhost:8000/api/v1/moves/r1bqkb1r/pppn1ppp/5n2/3N2B1/3P4/8/PP2PPPP/R
 
 ### Déroulé conseillé (~10 min)
 
-1. Position 1 : présenter les trois panneaux (coups, ouverture, vidéos) ; lancer une vidéo.
+1. Position 1 : présenter les panneaux (coups, ouverture, vidéos) ; lancer une vidéo ;
+   cliquer « Demander au coach » : montrer les outils choisis puis le conseil.
 2. Cocher « Évaluation Stockfish » : barre d'évaluation à côté de l'échiquier.
 3. Position 2 : montrer la reconnaissance de variante et la navigation ◀ ▶ (ou flèches du clavier).
-4. Positions 3 et 4 : les pièges, et le passage de la théorie à Stockfish.
+4. Positions 3 et 4 : les pièges, et le passage de la théorie à Stockfish. Avant
+   de jouer 6.Nxd5 dans la position 4, demander au coach « et si je joue Nxd5 ? » :
+   il vérifie le coup avec Stockfish et explique le piège.
 5. Position 5 : le mat.
 6. Position 6 : les cas dégradés.
 7. Montrer `/docs` (Swagger) et `docker compose ps` pour l'architecture.
@@ -482,7 +562,8 @@ Checklist à dérouler après une installation fraîche (dernière exécution :
 | 5 | http://localhost:4200, position 1 | Coups des maîtres, fiche « Partie espagnole » avec passages, 5 vidéos ; une vidéo se lit dans la page |
 | 6 | Position 4 | Message « Tu es sorti de la théorie », lignes Stockfish |
 | 7 | Case « Évaluation Stockfish » | Barre et score (« profondeur 18 ») |
-| 8 | ◀ ▶, « Nouvelle partie », ⇅ | Navigation, remise à zéro, échiquier retourné |
+| 8 | « Demander au coach » (position 1) | Outils affichés (Théorie Lichess, Articles...), puis conseil en français au fil de l'eau |
+| 8 bis | ◀ ▶, « Nouvelle partie », ⇅ | Navigation, remise à zéro, échiquier retourné |
 | 9 | Fenêtre étroite (mobile) | Panneaux sous l'échiquier, pas de défilement horizontal |
 | 10 | `docker compose stop backend`, puis action dans l'interface | Message « Le serveur de l'agent ne répond pas » + bouton Réessayer ; relancer avec `docker compose up -d backend` |
 | 11 | `docker compose down` puis `up -d` | Données conservées (voir [Persistance](#persistance-des-données)) |
@@ -498,6 +579,8 @@ Checklist à dérouler après une installation fraîche (dernière exécution :
 | Ingestion interrompue (`Killed`, code 137) | Mémoire Docker insuffisante ou backend resté allumé : passer à 12 Go et arrêter le backend pendant l'ingestion |
 | Milvus `unhealthy` après une ingestion | Processeur saturé : garder `EMBEDDING_THREADS=4` ; `restart: unless-stopped` le relance |
 | Panneau vidéos : « quota épuisé » | Quota YouTube du jour atteint (10 000 unités) : retour à minuit, heure du Pacifique ; le cache MongoDB continue de servir les ouvertures déjà vues |
+| Coach : « Coach indisponible : MISTRAL_API_KEY absente » | Ajouter la clé dans `.env` puis `docker compose up -d backend` |
+| Coach : « Trop de demandes au modèle Mistral » | Limite de l'offre Mistral (offre gratuite : quelques requêtes par seconde) : attendre une minute |
 | Interface : « Le serveur de l'agent ne répond pas » | Backend arrêté ou en train de charger le modèle (~20 s) : attendre `healthy` |
 
 ## Configuration
@@ -536,6 +619,12 @@ par défaut, sauf `LICHESS_TOKEN`.
 | `YOUTUBE_MIN_DURATION_SECONDS` / `YOUTUBE_MAX_DURATION_SECONDS` | `240` / `3600` | Durée acceptée |
 | `YOUTUBE_CACHE_TTL_DAYS` | `7` | Durée du cache des résultats |
 | `YOUTUBE_PREFERRED_CHANNELS` | *(vide)* | Identifiants de chaînes favorisées, séparés par des virgules |
+| `MISTRAL_API_KEY` | *(vide)* | Clé API Mistral (obligatoire pour le conseil du coach) |
+| `MISTRAL_MODEL` | `mistral-small-latest` | Modèle Mistral (doit gérer le tool calling) |
+| `MISTRAL_TEMPERATURE` | `0.2` | Température : basse pour des conseils stables |
+| `MISTRAL_TIMEOUT_SECONDS` | `30` | Timeout d'un appel au modèle |
+| `AGENT_MAX_STEPS` | `4` | Tours d'appels d'outils avant que l'agent doive conclure |
+| `AGENT_TIMEOUT_SECONDS` | `90` | Durée maximale d'une réponse complète |
 
 ### Ports
 

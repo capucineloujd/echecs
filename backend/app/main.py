@@ -3,9 +3,10 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 import asyncio
-from app.api.v1 import evaluate, health, moves, openings, vector_search, videos
+from app.api.v1 import agent, evaluate, health, moves, openings, vector_search, videos
 from app.config import settings
 from app.core.errors import (
+    AgentUnavailableError,
     EngineError,
     InvalidFenError,
     LichessAuthError,
@@ -13,7 +14,10 @@ from app.core.errors import (
     LichessUnavailableError,
     VectorStoreError,
 )
+from app.agent.graph import build_agent_graph
+from app.agent.tools import build_tools
 from app.services.lichess import LichessExplorerService
+from app.services.position_analysis import PositionAnalysisService
 from app.rag.catalog import OpeningCatalog
 from app.rag.graph import build_rag_graph
 from app.services.cache import MongoCache
@@ -52,11 +56,35 @@ async def lifespan(app: FastAPI):
     except Exception as exc:
         # L'API reste utilisable sans RAG : /vector-search renverra 503
         logger.error("RAG désactivé : %s", exc)
+    app.state.agent = build_agent(app)
     yield
     app.state.vector_store.close()
     await app.state.cache.close()
     await app.state.stockfish.stop()
     await app.state.lichess.close()
+
+
+def build_agent(app: FastAPI):
+    if not settings.mistral_api_key:
+        logger.warning("Coach désactivé : MISTRAL_API_KEY absente")
+        return None
+    from langchain_mistralai import ChatMistralAI
+
+    model = ChatMistralAI(
+        model=settings.mistral_model,
+        api_key=settings.mistral_api_key,
+        temperature=settings.mistral_temperature,
+        timeout=settings.mistral_timeout_seconds,
+        max_retries=2,
+    )
+    tools = build_tools(
+        PositionAnalysisService(settings, app.state.lichess, app.state.stockfish),
+        app.state.stockfish,
+        getattr(app.state, "rag_graph", None),
+        app.state.youtube,
+        settings.rag_min_score,
+    )
+    return build_agent_graph(model, tools, settings.agent_max_steps)
 
 
 app = FastAPI(title=settings.app_name, lifespan=lifespan)
@@ -67,6 +95,7 @@ app.include_router(evaluate.router, prefix=settings.api_v1_prefix)
 app.include_router(openings.router, prefix=settings.api_v1_prefix)
 app.include_router(vector_search.router, prefix=settings.api_v1_prefix)
 app.include_router(videos.router, prefix=settings.api_v1_prefix)
+app.include_router(agent.router, prefix=settings.api_v1_prefix)
 
 
 @app.exception_handler(InvalidFenError)
@@ -89,6 +118,7 @@ async def lichess_auth_handler(request: Request, exc: LichessAuthError):
 
 
 @app.exception_handler(LichessUnavailableError)
+@app.exception_handler(AgentUnavailableError)
 @app.exception_handler(EngineError)
 @app.exception_handler(VectorStoreError)
 async def unavailable_handler(request: Request, exc: Exception):

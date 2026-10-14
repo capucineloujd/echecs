@@ -1,6 +1,9 @@
-from fastapi import Request
-from app.core.errors import VectorStoreError
+from fastapi import Depends, Request
+
+from app.config import settings
+from app.core.errors import AgentUnavailableError, VectorStoreError
 from app.services.lichess import LichessExplorerService
+from app.services.position_analysis import PositionAnalysisService
 from app.services.stockfish import StockfishService
 
 def get_lichess(request: Request) -> LichessExplorerService:
@@ -24,3 +27,17 @@ def get_youtube(request: Request):
 
 def get_catalog(request: Request):
     return request.app.state.catalog
+
+
+def get_position_analysis(
+    lichess: LichessExplorerService = Depends(get_lichess),
+    stockfish: StockfishService = Depends(get_stockfish),
+) -> PositionAnalysisService:
+    return PositionAnalysisService(settings, lichess, stockfish)
+
+
+def get_agent(request: Request):
+    agent = getattr(request.app.state, "agent", None)
+    if agent is None:
+        raise AgentUnavailableError("Coach indisponible : MISTRAL_API_KEY absente de la configuration")
+    return agent

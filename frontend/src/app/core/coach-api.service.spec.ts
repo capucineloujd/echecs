@@ -59,6 +59,11 @@ describe('toApiError', () => {
     expect(error).toEqual({ status: 503, message: 'Lichess limite les requêtes', retryAfter: 42 });
   });
 
+  it('lit le détail quand le corps d’erreur est du texte (requête de streaming)', () => {
+    const error = toApiError(new HttpErrorResponse({ status: 503, error: '{"detail":"Coach indisponible"}' }));
+    expect(error.message).toBe('Coach indisponible');
+  });
+
   it('traduit la page 502 de nginx quand le backend est arrêté', () => {
     const error = toApiError(new HttpErrorResponse({ status: 502, error: '<html>Bad Gateway</html>' }));
     expect(error.message).toContain('ne répond pas');

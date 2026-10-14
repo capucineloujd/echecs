@@ -27,3 +27,7 @@ class EngineError(ExternalServiceError):
 
 class VectorStoreError(ExternalServiceError):
     """Milvus est injoignable ou la collection n'existe pas."""
+
+
+class AgentUnavailableError(Exception):
+    """Agent non configuré (clé Mistral absente)"""

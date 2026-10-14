@@ -69,5 +69,14 @@ class Settings(BaseSettings):
     # Chaînes favorisées dans le classement (identifiants séparés par des virgules)
     youtube_preferred_channels: str = ""
 
+    # Agent (LLM Mistral)
+    mistral_api_key: str = ""
+    mistral_model: str = "mistral-small-latest"
+    mistral_temperature: float = 0.2
+    mistral_timeout_seconds: int = 30
+    # Nombre max de tours d'appels d'outils avant que l'agent doive conclure
+    agent_max_steps: int = 4
+    agent_timeout_seconds: float = 90.0
+
 
 settings = Settings()

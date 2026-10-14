@@ -111,3 +111,9 @@ class VideosResponse(BaseModel):
     fallback_search_url: str = Field(description="Recherche YouTube à proposer si aucune vidéo n'est retenu")
     cached: bool = False
     quota_units_used: int = 0
+
+
+class AgentRequest(BaseModel):
+    fen: str = Field(description="Position à analyser")
+    moves: list[str] = Field([], max_length=300, description="Coups joués jusqu'ici (SAN), pour le contexte")
+    question: str | None = Field(None, max_length=500, description="Question de l'élève (facultative)")
