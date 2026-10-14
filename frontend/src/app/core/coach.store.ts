@@ -6,7 +6,7 @@ import { CoachApiService } from './coach-api.service';
 import { GameStore, positionKey } from './game.store';
 import { IDLE, LOADING, LoadState, withLoadState } from './load-state';
 
-/** Laisse le temps d'enchaîner plusieurs coups (ou flèches ◀ ▶) avant d'interroger l'API */
+/** Laisse le temps d'enchaîner plusieurs coups (ou boutons Précédent / Suivant) avant d'interroger l'API */
 const POSITION_DEBOUNCE_MS = 250;
 
 /**
@@ -72,7 +72,7 @@ export class CoachStore {
 
   /**
    * Vidéos : fournies par /vector-search quand l'ouverture est au catalogue.
-   * Sinon (ex. « King's Pawn Game »), seulement à la demande, pour ne pas consommer le quota YouTube.
+   * Sinon (ex. "King's Pawn Game"), seulement à la demande, pour ne pas consommer le quota YouTube.
    */
   private readonly extraVideos = toSignal(
     toObservable(this.extraVideosRequest).pipe(

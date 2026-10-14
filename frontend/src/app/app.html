@@ -1,5 +1,5 @@
 <header class="topbar">
-  <h1>♞ Coach d'ouvertures</h1>
+  <h1>Coach d'ouvertures</h1>
   <p>Entraîne-toi sur les ouvertures avec les conseils de l'agent</p>
 </header>
 
@@ -50,11 +50,11 @@
     }
 
     <div class="controls" role="group" aria-label="Navigation dans la partie">
-      <button type="button" (click)="game.first()" [disabled]="game.cursor() === 0" aria-label="Début">⏮</button>
-      <button type="button" (click)="game.previous()" [disabled]="game.cursor() === 0" aria-label="Coup précédent">◀</button>
-      <button type="button" (click)="game.next()" [disabled]="game.cursor() === game.plies().length" aria-label="Coup suivant">▶</button>
-      <button type="button" (click)="game.last()" [disabled]="game.cursor() === game.plies().length" aria-label="Fin">⏭</button>
-      <button type="button" (click)="game.flip()" aria-label="Retourner l'échiquier">⇅</button>
+      <button type="button" (click)="game.first()" [disabled]="game.cursor() === 0">Début</button>
+      <button type="button" (click)="game.previous()" [disabled]="game.cursor() === 0" aria-label="Coup précédent">Précédent</button>
+      <button type="button" (click)="game.next()" [disabled]="game.cursor() === game.plies().length" aria-label="Coup suivant">Suivant</button>
+      <button type="button" (click)="game.last()" [disabled]="game.cursor() === game.plies().length">Fin</button>
+      <button type="button" (click)="game.flip()" aria-label="Retourner l'échiquier">Retourner</button>
       <button type="button" (click)="game.reset()" [disabled]="!game.plies().length">Nouvelle partie</button>
     </div>
 

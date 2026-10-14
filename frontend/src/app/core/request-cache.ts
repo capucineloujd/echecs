@@ -5,7 +5,7 @@ import { Observable, of, share, tap } from 'rxjs';
  * - Une position déjà analysée (retour arrière dans la partie) ne refait pas d'appel.
  * - Deux composants qui demandent la même chose partagent la même requête en vol.
  * - Si plus personne n'écoute (l'élève a joué un autre coup), la requête est annulée.
- * - Les erreurs ne sont pas mises en cache : « Réessayer » relance vraiment l'appel.
+ * - Les erreurs ne sont pas mises en cache : "Réessayer" relance vraiment l'appel.
  */
 export class RequestCache {
   private readonly entries = new Map<string, Observable<unknown>>();

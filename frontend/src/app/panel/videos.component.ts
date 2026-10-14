@@ -53,17 +53,17 @@ const EMBED_PREFIX = 'https://www.youtube-nocookie.com/embed/';
                       <span class="video-title">{{ video.title }}</span>
                       <span class="muted">
                         {{ video.channel }} · {{ video.duration }} · {{ views(video.views) }} vues
-                        @if (video.language === 'fr') { · 🇫🇷 }
+                        @if (video.language === 'fr') { · en français }
                       </span>
                     </span>
                   </button>
-                  <a class="external" [href]="video.watch_url" target="_blank" rel="noopener" [attr.aria-label]="'Ouvrir ' + video.title + ' sur YouTube'">↗</a>
+                  <a class="external" [href]="video.watch_url" target="_blank" rel="noopener" [attr.aria-label]="'Ouvrir ' + video.title + ' sur YouTube'">YouTube</a>
                 </li>
               }
             </ul>
           } @else {
             <p class="muted">{{ data.message ?? 'Aucune vidéo trouvée.' }}</p>
-            <a [href]="data.fallback_search_url" target="_blank" rel="noopener">Chercher directement sur YouTube ↗</a>
+            <a [href]="data.fallback_search_url" target="_blank" rel="noopener">Chercher directement sur YouTube</a>
           }
         }
       }

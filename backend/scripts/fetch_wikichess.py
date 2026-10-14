@@ -79,7 +79,7 @@ def main() -> int:
                 try:
                     text = fetch_extract(client, api_url, title)
                 except (httpx.HTTPError, ValueError) as exc:
-                    print(f"  ✗ {opening['slug']} / {source} : {exc}", file=sys.stderr)
+                    print(f"  ECHEC {opening['slug']} / {source} : {exc}", file=sys.stderr)
                     errors += 1
                     continue
                 documents.append(
@@ -90,7 +90,7 @@ def main() -> int:
 
             if len(documents) < len(SOURCES):
                 # On garde la version précédente plutôt que d'écrire un article incomplet
-                print(f"  ✗ {opening['name']} : incomplet, fichier non modifié", file=sys.stderr)
+                print(f"  ECHEC {opening['name']} : incomplet, fichier non modifié", file=sys.stderr)
                 continue
 
             record = {k: opening[k] for k in ("slug", "name", "eco", "moves", "aliases")}
@@ -99,7 +99,7 @@ def main() -> int:
             out = RAW_DIR / f"{opening['slug']}.json"
             out.write_text(json.dumps(record, ensure_ascii=False, indent=2))
             sizes = ", ".join(f"{d['source']}={len(d['text'])}" for d in documents)
-            print(f"  ✓ {opening['name']} ({sizes})")
+            print(f"  OK {opening['name']} ({sizes})")
 
     return 1 if errors else 0
 

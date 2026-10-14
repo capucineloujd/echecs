@@ -34,7 +34,7 @@ def _error_message(exc: BaseException) -> str:
         return f"Le modèle de langage a répondu une erreur {status}."
     if isinstance(exc, ollama.ResponseError):
         if exc.status_code == 404:
-            return f"Modèle absent d'Ollama : lancer « ollama pull {settings.ollama_model} »."
+            return f"Modèle absent d'Ollama : lancer 'ollama pull {settings.ollama_model}'."
         return f"Ollama a répondu une erreur : {exc.error}"
     if isinstance(exc, (httpx.HTTPError, ConnectionError)):
         return "Modèle de langage injoignable (Ollama est-il lancé sur la machine ?)."

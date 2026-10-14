@@ -66,6 +66,20 @@ choisit lui-même ses sources et rédige un conseil adapté à un jeune joueur, 
 | Clé YouTube | Facultative |
 
 
+### Configurer
+
+```bash
+echo "LICHESS_TOKEN=lip_xxx" > .env
+echo "YOUTUBE_API_KEY=AIza..." >> .env
+```
+
+### Installer Ollama (sur la machine, hors Docker)
+
+```bash
+brew install ollama && brew services start ollama
+ollama pull qwen3:8b
+```
+
 ### Construire et lancer
 
 ```bash
@@ -75,6 +89,14 @@ les 6 services doivent apparaître `healthy` :
 
 ```bash
 docker compose ps
+```
+
+### Indexer les articles (premier lancement, ou après `down -v`)
+
+```bash
+docker compose stop backend
+docker compose run --rm backend python -m scripts.ingest
+docker compose up -d backend
 ```
 
 ### Ouvrir
@@ -315,14 +337,14 @@ Stockfish si Lichess est indisponible) est dans
   promotion). Si aucun ne correspond, l'échiquier est remis sur la position du store.
 - `switchMap` annule la requête de la position précédente : une réponse ne peut
   pas s'afficher sur une autre position que celle de l'échiquier.
-- Navigation ◀ ▶ (ou flèches du clavier) dans les coups joués ; jouer un autre
+- Navigation Précédent / Suivant (ou flèches du clavier) dans les coups joués ; jouer un autre
   coup au milieu de la partie remplace la suite.
 
 ### Optimisation des appels
 
 | Mécanisme | Effet |
 |---|---|
-| Debounce 250 ms | Plusieurs coups enchaînés (ou ◀ ▶ rapides) : un seul appel, pour la position finale |
+| Debounce 250 ms | Plusieurs coups enchaînés (ou navigation rapide) : un seul appel, pour la position finale |
 | Cache LRU par FEN (`RequestCache`) | Revenir sur une position déjà vue ne refait pas d'appel ; requêtes identiques partagées |
 | Annulation | Une requête qui n'a plus d'abonné est annulée ; les erreurs ne sont pas mises en cache |
 | Contexte par ouverture | `/vector-search` n'est appelé que quand le nom d'ouverture change, pas à chaque coup ; le nom reste affiché hors théorie |

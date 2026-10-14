@@ -36,8 +36,7 @@ const TOOL_LABELS: Record<string, string> = {
         <ul class="tools" aria-label="Sources consultées par le coach">
           @for (tool of advice().tools; track tool.id) {
             <li [class]="tool.status">
-              <span aria-hidden="true">{{ tool.status === 'running' ? '⏳' : tool.status === 'success' ? '✓' : '⚠' }}</span>
-              {{ label(tool) }}
+              {{ label(tool) }}{{ tool.status === 'running' ? ' (en cours)' : tool.status === 'error' ? ' (erreur)' : '' }}
             </li>
           }
         </ul>
