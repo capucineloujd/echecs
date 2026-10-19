@@ -7,12 +7,12 @@ export interface Ply {
   fen: string;
 }
 
-/** Position + trait : suffit pour savoir si deux FEN décrivent la même position affichée */
+// position + trait
 export function samePosition(a: string, b: string): boolean {
   return a.split(' ').slice(0, 2).join(' ') === b.split(' ').slice(0, 2).join(' ');
 }
 
-/** Clé de position indépendante des compteurs de coups et de la notation en passant (qui varie selon les librairies) */
+// sans compteurs ni en passant (ça change selon les libs)
 export function positionKey(fen: string): string {
   return fen.split(' ').slice(0, 3).join(' ');
 }
@@ -21,14 +21,11 @@ function toPly(move: Move): Ply {
   return { san: move.san, uci: move.from + move.to + (move.promotion ?? ''), fen: move.after };
 }
 
-/**
- * État de la partie, source de vérité unique : l'échiquier l'affiche, l'agent l'analyse.
- * chess.js valide les coups ; on garde l'historique pour naviguer sans rappeler l'API.
- */
+// état de la partie (chess.js)
 @Injectable({ providedIn: 'root' })
 export class GameStore {
   readonly plies = signal<Ply[]>([]);
-  /** Nombre de demi-coups joués dans la position affichée (on peut revenir en arrière) */
+  // index du coup affiché
   readonly cursor = signal(0);
   readonly orientation = signal<'white' | 'black'>('white');
 
@@ -43,7 +40,6 @@ export class GameStore {
     return null;
   });
 
-  /** Joue un coup en notation SAN (clic sur une suggestion) */
   playSan(san: string): boolean {
     try {
       this.push(new Chess(this.fen()).move(san));
@@ -53,10 +49,7 @@ export class GameStore {
     }
   }
 
-  /**
-   * Coup joué sur l'échiquier : ngx-chess-board ne donne que la FEN obtenue,
-   * on retrouve le coup légal qui y mène (gère roques, prises en passant et promotions).
-   */
+  // la lib ne donne que la FEN, on cherche le coup qui y mène
   playFromBoardFen(boardFen: string): boolean {
     const game = new Chess(this.fen());
     const move = game.moves({ verbose: true }).find((m) => samePosition(m.after, boardFen));
@@ -65,7 +58,7 @@ export class GameStore {
     return true;
   }
 
-  /** Charge une suite de coups SAN, ex. "e4 e5 Nf3 Nc6 Bb5" */
+  // ex : "e4 e5 Nf3 Nc6 Bb5"
   loadLine(sans: string): void {
     const game = new Chess();
     const plies = sans.split(/\s+/).filter(Boolean).map((san) => toPly(game.move(san)));
@@ -107,11 +100,11 @@ export class GameStore {
     const cursor = this.cursor();
     const next = this.plies()[cursor];
     if (next?.uci === ply.uci) {
-      // Même coup que la suite déjà connue : on avance sans effacer la ligne
+      // même coup : on avance
       this.cursor.set(cursor + 1);
       return;
     }
-    // Nouveau coup au milieu de la partie : la suite précédente est remplacée
+    // sinon on remplace la suite
     this.plies.set([...this.plies().slice(0, cursor), ply]);
     this.cursor.set(cursor + 1);
   }

@@ -12,8 +12,5 @@ async def get_videos(
     opening: str = Path(..., min_length=2, max_length=120, description="Slug (espagnole), nom ou nom Lichess de l'ouverture"),
     youtube: YouTubeService = Depends(get_youtube),
 ):
-    """Vidéos YouTube explicatives pour une ouverture, filtrées et classées.
-
-    Répond toujours 200 : le champ `status` indique ok, no_results, quota_exceeded ou unavailable.
-    """
+    """Vidéos YouTube d'une ouverture (toujours 200, voir status)"""
     return await youtube.find_videos(opening)

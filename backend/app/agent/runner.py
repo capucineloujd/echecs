@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 
 def _text(content: Any) -> str:
-    # Mistral renvoie une chaîne ; certains modèles renvoient une liste de blocs typés
+    # Mistral renvoie une string, d'autres modèles une liste
     if isinstance(content, str):
         return content
     return "".join(block.get("text", "") for block in content if isinstance(block, dict) and block.get("type") == "text")
@@ -52,7 +52,7 @@ async def stream_agent(
             async for mode, chunk in graph.astream(inputs, config=config, stream_mode=["messages", "updates"]):
                 if mode == "messages":
                     message, metadata = chunk
-                    # Seul le nœud de rédaction est streamé (pas le JSON des décisions)
+                    # on stream seulement la réponse finale
                     if metadata.get("langgraph_node") == "answer" and isinstance(message, AIMessage):
                         if text := _text(message.content):
                             yield {"event": "token", "text": text}
@@ -71,7 +71,7 @@ async def stream_agent(
                                 "status": message.status,
                             }
         yield {"event": "done", "tools_used": tools_used}
-    except Exception as exc:  # le flux HTTP est déjà ouvert : l'erreur est envoyée comme un événement
+    except Exception as exc:  # on envoie l'erreur dans le flux
         if isinstance(exc, (TimeoutError, httpx.HTTPError, ConnectionError, ollama.ResponseError)):
             logger.warning("Agent en erreur : %r", exc)
         else:

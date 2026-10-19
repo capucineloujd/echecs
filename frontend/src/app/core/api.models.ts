@@ -1,4 +1,4 @@
-// Miroir des schémas Pydantic du backend (backend/app/schemas.py)
+// mêmes types que backend/app/schemas.py
 
 export interface Opening {
   eco: string;
@@ -18,7 +18,6 @@ export interface TheoryMove {
   average_rating: number | null;
 }
 
-/** Évaluation du point de vue des Blancs */
 export interface Score {
   centipawns: number | null;
   mate: number | null;

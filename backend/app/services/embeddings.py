@@ -11,7 +11,7 @@ class EmbeddingService:
     def __init__(self, model_name: str, batch_size: int = 16, threads: int = 4, query_instruction: str = ""):
         logger.info("Chargement du modèle d'embedding %s", model_name)
         torch.set_num_threads(threads)
-        # float32 forcé : le modèle est stocké en bfloat16, très lent sur CPU
+        # float32 sinon c'est très lent sur CPU
         self._model = SentenceTransformer(model_name, device="cpu", model_kwargs={"dtype": torch.float32})
         self._batch_size = batch_size
         self._query_instruction = query_instruction

@@ -40,7 +40,6 @@ def describe_score(score: Score) -> str:
 
 
 def material(board: chess.Board) -> int:
-    """Matériel des Blancs moins celui des Noirs."""
     return sum(
         value * (len(board.pieces(piece, chess.WHITE)) - len(board.pieces(piece, chess.BLACK)))
         for piece, value in PIECE_VALUES.items()

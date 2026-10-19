@@ -4,11 +4,10 @@ import { Observable, TimeoutError, catchError, map, of, startWith } from 'rxjs';
 export interface ApiError {
   status: number;
   message: string;
-  /** Secondes à attendre avant de réessayer (en-tête Retry-After) */
+  // Retry-After
   retryAfter: number | null;
 }
 
-/** État d'un appel affiché dans l'interface : chaque panneau gère son chargement et ses erreurs */
 export type LoadState<T> =
   | { status: 'idle' }
   | { status: 'loading' }
@@ -29,7 +28,7 @@ export function toApiError(err: unknown): ApiError {
     const detail = errorDetail(err.error);
     const retryAfter = Number(err.headers.get('Retry-After')) || null;
     if (!detail && [502, 503, 504].includes(err.status)) {
-      // Réponse du proxy nginx (backend arrêté ou en train de charger le modèle)
+      // erreur nginx, backend pas prêt
       return { status: err.status, message: "Le serveur de l'agent ne répond pas, il démarre peut-être encore.", retryAfter };
     }
     return { status: err.status, message: detail ?? `Erreur ${err.status}`, retryAfter };
@@ -37,7 +36,7 @@ export function toApiError(err: unknown): ApiError {
   return { status: -1, message: 'Erreur inattendue.', retryAfter: null };
 }
 
-/** Champ `detail` de FastAPI ; le corps est une chaîne quand la requête attend du texte (flux SSE) */
+// detail de FastAPI (string pour le SSE)
 function errorDetail(body: unknown): string | null {
   if (typeof body === 'string') {
     try {
@@ -50,7 +49,7 @@ function errorDetail(body: unknown): string | null {
   return typeof detail === 'string' ? detail : null;
 }
 
-/** Transforme un appel HTTP en flux d'états : loading, puis ok ou error (sans jamais casser le flux parent) */
+// loading puis ok ou error
 export function withLoadState<T>(source: Observable<T>): Observable<LoadState<T>> {
   return source.pipe(
     map((data): LoadState<T> => ({ status: 'ok', data })),

@@ -7,7 +7,7 @@ from app.schemas import VideosResponse
 from app.services.vector_store import VectorStoreService
 
 if TYPE_CHECKING:
-    # Évite de charger torch à l'import du module
+    # pour ne pas importer torch
     from app.services.embeddings import EmbeddingService
     from app.services.youtube import YouTubeService
 
@@ -40,12 +40,12 @@ def build_rag_graph(
 
     async def retrieve(state: RagState) -> RagState:
         vector = await embedder.aembed_query(state["query"])
-        # On demande un peu plus que top_k : le formatage filtre ensuite les doublons et scores faibles
+        # x2 car on enlève les doublons après
         hits = await store.asearch(vector, top_k=state["top_k"] * 2, opening_slug=state.get("filter_slug"))
         return {"hits": hits}
 
     async def find_videos(state: RagState) -> RagState:
-        # Vidéos seulement si une ouverture est identifiée : une requête vague coûterait du quota pour rien
+        # pas d'ouverture = pas de vidéos (quota)
         detected = state.get("detected")
         if youtube is None or detected is None or not state.get("include_videos", True):
             return {"videos": None}

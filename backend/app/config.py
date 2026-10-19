@@ -11,7 +11,7 @@ class Settings(BaseSettings):
     lichess_token: str = ""
     lichess_explorer_url: str = "https://explorer.lichess.ovh"
     lichess_database: str = "masters"
-    # Filtres utilisés seulement pour la base "lichess"
+    # pour la base lichess
     lichess_speeds: str = "blitz,rapid,classical"
     lichess_ratings: str = "2000,2200,2500"
     lichess_max_moves: int = 10
@@ -32,7 +32,7 @@ class Settings(BaseSettings):
 
     embedding_model: str = "Qwen/Qwen3-Embedding-0.6B"
     embedding_batch_size: int = 16
-    # Threads CPU pour torch : on en laisse pour Milvus (sinon il perd son bail etcd)
+    # pas tous les threads pour torch, sinon Milvus plante
     embedding_threads: int = 4
     embedding_query_instruction: str = (
         "Instruct: Given a chess player's question, retrieve encyclopedia passages "
@@ -58,7 +58,7 @@ class Settings(BaseSettings):
     llm_provider: str = "ollama"
     llm_temperature: float = 0.2
     llm_timeout_seconds: int = 120
-    # Ollama tourne sur la machine hôte (accès au GPU), le conteneur l'appelle via host.docker.internal
+    # Ollama tourne sur l'hôte (GPU)
     ollama_base_url: str = "http://host.docker.internal:11434"
     ollama_model: str = "qwen3:8b"
     ollama_num_ctx: int = 8192

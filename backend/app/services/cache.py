@@ -47,7 +47,7 @@ class MongoCache:
         except PyMongoError as exc:
             logger.warning("MongoDB indisponible, cache mémoire utilisé : %s", exc)
             return await self._fallback.get(key)
-        # L'index TTL nettoie en différé (~60 s) : on revérifie l'expiration
+        # l'index TTL de Mongo n'est pas instantané
         if doc and doc["expires_at"] > datetime.now(timezone.utc).replace(tzinfo=None):
             return doc["value"]
         return None

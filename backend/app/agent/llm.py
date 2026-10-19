@@ -15,7 +15,7 @@ def build_chat_model(settings: Settings) -> BaseChatModel | None:
             model=settings.ollama_model,
             base_url=settings.ollama_base_url,
             temperature=settings.llm_temperature,
-            # Contexte par défaut d'Ollama trop court pour le prompt + les résultats d'outils
+            # contexte par défaut d'Ollama trop petit
             num_ctx=settings.ollama_num_ctx,
             reasoning=settings.ollama_reasoning,
             client_kwargs={"timeout": settings.llm_timeout_seconds},

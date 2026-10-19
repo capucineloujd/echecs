@@ -31,7 +31,7 @@ class YouTubeClient:
         self._timeout = timeout
 
     def _service(self):
-        # httplib2 n'est pas thread-safe : un client par appel
+        # un client par appel (pas thread-safe)
         return build(
             "youtube", "v3", developerKey=self._api_key, http=httplib2.Http(timeout=self._timeout),
             cache_discovery=False, static_discovery=True,
@@ -115,7 +115,7 @@ class YouTubeService:
             return VideosResponse(**base, status="unavailable", message="Clé YOUTUBE_API_KEY non configurée")
 
         cache_key = f"youtube:videos:{info.slug if info else normalize(opening)}"
-        # Verrou : deux requêtes simultanées sur la même ouverture ne paient le quota qu'une fois
+        # lock pour ne pas payer le quota 2 fois
         async with self._lock:
             cached = await self._cache.get(cache_key)
             if cached is not None:
@@ -147,14 +147,14 @@ class YouTubeService:
                     **base, status="no_results", quota_units_used=units,
                     message="Aucune vidéo de qualité trouvée pour cette ouverture",
                 )
-                ttl = 86400  # on retentera demain plutôt que dans une semaine
+                ttl = 86400  # 1 jour
 
             await self._cache.set(cache_key, result.model_dump(mode="json"), ttl)
             return result
 
     async def _search(self, opening: str, info: OpeningInfo | None) -> tuple[list[Video], int]:
         terms = relevance_terms(opening, info)
-        # Variante hors catalogue : le terme le plus précis ("najdorf") est le dernier
+        # hors catalogue : on prend le dernier mot
         specific = terms[-1] if info is None and len(terms) > 1 else None
         wanted = self._settings.youtube_max_videos
         queries = [

@@ -8,7 +8,6 @@ const TOOL_LABELS: Record<string, string> = {
   find_videos: 'Vidéos YouTube',
 };
 
-/** Conseil rédigé par l'agent (Mistral + outils), affiché au fil de l'eau */
 @Component({
   selector: 'app-coach-advice',
   template: `
@@ -79,7 +78,7 @@ export class CoachAdviceComponent {
   protected readonly advice = this.store.advice;
   protected readonly question = signal('');
 
-  /** Gras Markdown (**texte**) rendu sans innerHTML */
+  // **gras** sans innerHTML
   protected readonly parts = computed(() =>
     this.advice()
       .text.split('**')

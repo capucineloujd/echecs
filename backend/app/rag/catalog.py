@@ -32,7 +32,7 @@ def normalize(text: str) -> str:
 class OpeningCatalog:
     def __init__(self, openings: list[OpeningInfo]):
         self.openings = {o.slug: o for o in openings}
-        # Alias les plus longs d'abord : "gambit dame" doit gagner sur "dame"
+        # alias les plus longs d'abord ("gambit dame" avant "dame")
         self._aliases = sorted(
             ((normalize(alias), o) for o in openings for alias in o.search_terms),
             key=lambda pair: len(pair[0]),

@@ -1,7 +1,6 @@
 import { Component, computed, input, output } from '@angular/core';
 import { Ply } from '../core/game.store';
 
-/** Liste des coups numérotée, cliquable pour revenir à une position */
 @Component({
   selector: 'app-move-list',
   template: `

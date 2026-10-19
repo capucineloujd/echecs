@@ -3,7 +3,6 @@ import { MovesResponse } from '../core/api.models';
 import { compactNumber, describeScore, formatScore } from '../core/format';
 import { LoadState } from '../core/load-state';
 
-/** Coups suggérés : théorie Lichess, ou lignes Stockfish une fois sorti de la théorie */
 @Component({
   selector: 'app-suggestions',
   template: `

@@ -84,7 +84,7 @@ class StockfishService:
     @staticmethod
     def _game_over_evaluation(board: chess.Board) -> Evaluation:
         outcome = board.outcome()
-        # Mat sur l'échiquier : mate=0 (le camp au trait est maté). Nulle : 0 centipawn.
+        # partie finie : mat ou nulle
         score = Score(centipawns=0) if outcome.winner is None else Score(mate=0)
         return Evaluation(
             fen=board.fen(),

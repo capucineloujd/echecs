@@ -14,7 +14,7 @@ SOURCES = {
     "wikibooks": ("https://en.wikibooks.org/w/api.php", "https://en.wikibooks.org/wiki/", "en"),
     "wikipedia_fr": ("https://fr.wikipedia.org/w/api.php", "https://fr.wikipedia.org/wiki/", "fr"),
 }
-# Wikimedia demande un User-Agent identifiable
+# Wikimedia veut un User-Agent
 USER_AGENT = "EchecsCoachFFE-POC/0.1 (educational project)"
 
 
@@ -89,7 +89,7 @@ def main() -> int:
                 time.sleep(2)
 
             if len(documents) < len(SOURCES):
-                # On garde la version précédente plutôt que d'écrire un article incomplet
+                # on garde l'ancienne version
                 print(f"  ECHEC {opening['name']} : incomplet, fichier non modifié", file=sys.stderr)
                 continue
 

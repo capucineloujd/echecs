@@ -6,7 +6,6 @@ COPY . .
 RUN npm run build
 
 FROM nginx:1.30.0-alpine
-# Le template est passé à envsubst au démarrage par l'image nginx officielle
 ENV BACKEND_URL=http://backend:8000
 COPY nginx/default.conf.template /etc/nginx/templates/default.conf.template
 COPY --from=build /app/dist/frontend/browser /usr/share/nginx/html

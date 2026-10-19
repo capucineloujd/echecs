@@ -6,7 +6,7 @@ import { RequestCache } from './request-cache';
 
 const API = '/api/v1';
 
-/** La FEN va dans le chemin : le backend accepte "_" à la place des espaces, les "/" restent tels quels */
+// espaces remplacés par _ dans l'URL
 export function fenToPath(fen: string): string {
   return fen.trim().replace(/ /g, '_');
 }
@@ -20,7 +20,6 @@ export class CoachApiService {
     return this.cache.get('openings', () => this.http.get<OpeningRef[]>(`${API}/openings`).pipe(timeout(10_000)));
   }
 
-  /** Coups théoriques (Lichess) ou, hors théorie, lignes Stockfish */
   moves(fen: string): Observable<MovesResponse> {
     return this.cache.get(`moves:${fen}`, () =>
       this.http.get<MovesResponse>(`${API}/moves/${fenToPath(fen)}`).pipe(timeout(20_000)),
@@ -33,7 +32,6 @@ export class CoachApiService {
     );
   }
 
-  /** Passages Wikibooks/Wikipédia sur l'ouverture (graphe LangGraph), vidéos incluses si elle est au catalogue */
   openingContext(openingName: string): Observable<VectorSearchResponse> {
     const params = { query: `Idées, plans et pièges de l'ouverture ${openingName}`, opening: openingName, top_k: 3 };
     return this.cache.get(`context:${openingName}`, () =>

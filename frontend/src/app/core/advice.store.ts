@@ -21,7 +21,6 @@ export interface Advice {
 
 const IDLE_ADVICE: Advice = { status: 'idle', fen: null, text: '', tools: [], error: null };
 
-/** Conseil de l'agent, demandé par l'élève (bouton) pour la position affichée */
 @Injectable({ providedIn: 'root' })
 export class AdviceStore {
   private readonly agent = inject(AgentService);
@@ -31,7 +30,7 @@ export class AdviceStore {
   readonly advice = signal<Advice>(IDLE_ADVICE);
 
   constructor() {
-    // Le conseil appartient à une position : on l'efface (et on annule l'appel) dès qu'elle change
+    // on efface le conseil quand la position change
     effect(() => {
       const fen = this.game.fen();
       untracked(() => {
@@ -51,7 +50,7 @@ export class AdviceStore {
         this.advice.update((a) => {
           switch (event.event) {
             case 'tool_start':
-              // Le texte écrit avant un appel d'outil n'est qu'une réflexion intermédiaire
+              // texte avant un outil = brouillon
               return { ...a, text: '', tools: [...a.tools, { id: event.id, name: event.name, args: event.args, status: 'running' }] };
             case 'tool_end':
               return { ...a, tools: a.tools.map((t) => (t.id === event.id ? { ...t, status: event.status } : t)) };

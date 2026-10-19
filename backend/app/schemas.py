@@ -21,7 +21,7 @@ class TheoryMove(BaseModel):
 
 
 class Score(BaseModel):
-    """Évaluation du point de vue des Blancs (positif = avantage Blancs)."""
+    """Point de vue des Blancs"""
 
     centipawns: int | None = None
     mate: int | None = Field(None, description="Mat en N coups (négatif = les Noirs matent)")

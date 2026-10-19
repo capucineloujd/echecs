@@ -32,7 +32,7 @@
 
 .board-column {
   display: grid;
-  // Sans minmax(0, …) la colonne prend la largeur de l'échiquier et déborde sur mobile
+  // minmax(0, ...) sinon ça déborde sur mobile
   grid-template-columns: minmax(0, 1fr);
   gap: 0.75rem;
 }

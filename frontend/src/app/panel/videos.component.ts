@@ -6,7 +6,6 @@ import { LoadState } from '../core/load-state';
 
 const EMBED_PREFIX = 'https://www.youtube-nocookie.com/embed/';
 
-/** Vidéos YouTube : liste + lecteur intégré (youtube-nocookie) */
 @Component({
   selector: 'app-videos',
   template: `
@@ -83,13 +82,13 @@ export class VideosComponent {
     return s.status === 'ok' ? s.data : null;
   });
 
-  /** Vidéo en lecture, remise à zéro quand la liste change (autre ouverture) */
+  // reset quand la liste change
   protected readonly playing = linkedSignal<VideosResponse | null, Video | null>({
     source: this.response,
     computation: () => null,
   });
 
-  /** Seules les URL youtube-nocookie sont autorisées dans l'iframe */
+  // que youtube-nocookie
   protected readonly embedUrl = computed((): SafeResourceUrl | null => {
     const url = this.playing()?.embed_url;
     return url?.startsWith(EMBED_PREFIX) ? this.sanitizer.bypassSecurityTrustResourceUrl(url) : null;

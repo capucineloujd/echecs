@@ -25,7 +25,7 @@ describe('GameStore', () => {
     game.loadLine('e4 e5 Nf3 Nc6 Bc4 Bc5');
     const afterCastle = new Chess(game.fen());
     afterCastle.move('O-O');
-    // La librairie d'échiquier peut renvoyer des compteurs différents : seules position et trait comptent
+    // les compteurs peuvent changer
     const boardFen = afterCastle.fen().replace(/ \d+ \d+$/, ' 0 1');
     expect(game.playFromBoardFen(boardFen)).toBe(true);
     expect(game.lastMove()?.san).toBe('O-O');
@@ -42,12 +42,12 @@ describe('GameStore', () => {
     game.previous();
     expect(game.cursor()).toBe(1);
 
-    // Même coup que la suite connue : la ligne est conservée
+    // même coup : on garde la suite
     game.playSan('e5');
     expect(game.plies().length).toBe(3);
     expect(game.cursor()).toBe(2);
 
-    // Autre coup : la suite est remplacée
+    // autre coup : suite remplacée
     game.previous();
     game.playSan('c5');
     expect(game.plies().map((p) => p.san)).toEqual(['e4', 'c5']);

@@ -72,6 +72,5 @@ def _split_long(paragraph: str, max_chars: int) -> list[str]:
 
 
 def embedding_text(opening_name: str, eco: str, section: str, text: str) -> str:
-    """Texte réellement vectorisé : on préfixe le contexte pour qu'un passage
-    isolé ("3...a6 forces White to...") reste rattaché à son ouverture."""
+    # on ajoute le nom de l'ouverture pour garder le contexte
     return f"{opening_name} ({eco}) : {section}\n{text}"

@@ -27,7 +27,7 @@ describe('RequestCache', () => {
     subscription.unsubscribe();
     expect(pending.observed).toBe(false);
 
-    // Requête annulée avant la réponse : la suivante repart de zéro au lieu de rester bloquée
+    // annulée : la suivante relance la requête
     let calls = 0;
     cache.get('a', () => defer(() => of(++calls))).subscribe();
     expect(calls).toBe(1);

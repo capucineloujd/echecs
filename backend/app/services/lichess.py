@@ -38,7 +38,7 @@ class LichessExplorerService:
 
     async def get_theory_moves(self, board: chess.Board, database: str | None = None) -> ExplorerResult:
         database = database or self._settings.lichess_database
-        # Lichess ignore les compteurs de coups : on les retire de la clé de cache
+        # on enlève les compteurs de coups de la clé
         key = (database, " ".join(board.fen().split()[:4]))
 
         cached = self._cache.get(key)

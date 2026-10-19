@@ -1,4 +1,3 @@
-# Nom fixe : volumes et images ne dépendent pas du nom du dossier cloné
 name: echecs
 
 services:
@@ -10,7 +9,7 @@ services:
     ports:
       - "${FRONTEND_HOST_PORT:-4200}:80"
     depends_on:
-      # Pas d'attente du healthcheck : l'interface affiche les erreurs pendant le chargement du modèle
+      # pas besoin d'attendre le healthcheck
       - backend
     restart: unless-stopped
 
@@ -22,7 +21,7 @@ services:
       BACKEND_PORT: ${BACKEND_PORT:-8000}
       MILVUS_URI: http://milvus:19530
       MONGO_URI: mongodb://mongodb:27017
-    # Ollama tourne sur l'hôte ; nécessaire sous Linux, Docker Desktop le définit déjà
+    # pour Linux
     extra_hosts:
       - "host.docker.internal:host-gateway"
     ports:

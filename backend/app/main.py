@@ -36,14 +36,14 @@ async def lifespan(app: FastAPI):
     try:
         await app.state.stockfish.start()
     except EngineError as exc:
-        # L'API démarre quand même : le moteur sera relancé à la première requête
+        # on relancera Stockfish à la prochaine requête
         logger.error("%s", exc)
     app.state.cache = MongoCache(settings.mongo_uri, settings.mongo_db)
     app.state.catalog = catalog = OpeningCatalog.load()
     app.state.youtube = YouTubeService(settings, app.state.cache, catalog)
     app.state.vector_store = VectorStoreService(settings.milvus_uri, settings.milvus_collection)
     try:
-        # Import tardif : torch est long à charger, inutile pour /moves et /evaluate
+        # import ici car torch est long à charger
         from app.services.embeddings import EmbeddingService
 
         embedder = await asyncio.to_thread(
@@ -55,7 +55,7 @@ async def lifespan(app: FastAPI):
         )
         app.state.rag_graph = build_rag_graph(embedder, app.state.vector_store, catalog, app.state.youtube)
     except Exception as exc:
-        # L'API reste utilisable sans RAG : /vector-search renverra 503
+        # sans RAG, /vector-search renvoie 503
         logger.error("RAG désactivé : %s", exc)
     app.state.agent = build_agent(app)
     yield

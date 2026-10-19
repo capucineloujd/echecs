@@ -1,13 +1,13 @@
 import { Score } from './api.models';
 
-/** "+0.35", "-1.20", "#3" (mat en 3 pour les Blancs), "#-2" */
+// ex : "+0.35", "#3", "#-2"
 export function formatScore(score: Score): string {
   if (score.mate !== null && score.mate !== undefined) return `#${score.mate}`;
   const pawns = (score.centipawns ?? 0) / 100;
   return `${pawns > 0 ? '+' : ''}${pawns.toFixed(2)}`;
 }
 
-/** Phrase compréhensible par un jeune joueur */
+// phrase simple pour les jeunes
 export function describeScore(score: Score): string {
   if (score.mate !== null && score.mate !== undefined) {
     if (score.mate === 0) return 'Échec et mat';
@@ -21,7 +21,7 @@ export function describeScore(score: Score): string {
   return `Avantage décisif aux ${side}`;
 }
 
-/** Part de la barre d'évaluation côté Blancs, entre 0 et 100 */
+// entre 0 et 100
 export function whiteShare(score: Score): number {
   if (score.mate !== null && score.mate !== undefined) return score.mate > 0 ? 100 : score.mate < 0 ? 0 : 50;
   const cp = score.centipawns ?? 0;

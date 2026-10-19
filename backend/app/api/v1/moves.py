@@ -10,12 +10,12 @@ from app.services.position_analysis import PositionAnalysisService
 router = APIRouter(tags=["moves"])
 
 
-# {fen:path}: une FEN contient des "/", qu'un paramètre classique refuserait
+# fen:path car la FEN contient des /
 @router.get("/moves/{fen:path}", response_model=MovesResponse)
 async def get_moves(
     fen: str,
     database: Literal["masters", "lichess"] | None = Query(None, description="Base Lichess à interroger"),
     analysis: PositionAnalysisService = Depends(get_position_analysis),
 ):
-    """Coups théoriques depuis Lichess. Hors théorie (ou Lichess indisponible) : Stockfish prend le relais."""
+    """Coups Lichess, ou Stockfish si hors théorie"""
     return await analysis.analyze(parse_fen(fen), database)

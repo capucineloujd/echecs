@@ -76,7 +76,7 @@ def build_agent_graph(model: BaseChatModel, tools: list, max_steps: int = 4):
     graph.add_node("read_position", read_position)
     graph.add_node("decide", decide)
     graph.add_node("answer", answer)
-    # Une erreur d'outil (Lichess en panne...) devient un résultat, que le LLM voit au tour suivant
+    # si un outil plante, le LLM voit l'erreur au tour suivant
     graph.add_node("tools", ToolNode(tools, handle_tool_errors=True))
     graph.add_edge(START, "read_position")
     graph.add_edge("read_position", "tools")
@@ -87,7 +87,7 @@ def build_agent_graph(model: BaseChatModel, tools: list, max_steps: int = 4):
 
 
 def _reminder(state: AgentState) -> HumanMessage:
-    """Placé en dernier : c'est la fin du contexte qu'un petit modèle suit le mieux."""
+    # mis à la fin car les petits modèles suivent mieux la fin du contexte
     analysis = next((m.content for m in state["messages"] if isinstance(m, ToolMessage)), "")
     facts = [line for line in analysis.splitlines() if line.startswith(("Source choisie", "Ouverture", "Coup de référence"))]
     in_theory = analysis.startswith("Source choisie : théorie")
@@ -101,7 +101,7 @@ def _reminder(state: AgentState) -> HumanMessage:
 
 
 def _as_text(messages: list) -> list:
-    """Certains modèles refusent un historique d'appels d'outils quand aucun outil n'est déclaré."""
+    # certains modèles refusent les tool calls dans l'historique s'il n'y a pas d'outils
     converted = []
     for message in messages:
         if isinstance(message, ToolMessage):

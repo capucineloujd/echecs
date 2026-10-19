@@ -6,14 +6,10 @@ import { CoachApiService } from './coach-api.service';
 import { GameStore, positionKey } from './game.store';
 import { IDLE, LOADING, LoadState, withLoadState } from './load-state';
 
-/** Laisse le temps d'enchaîner plusieurs coups (ou boutons Précédent / Suivant) avant d'interroger l'API */
+// attendre un peu si on joue plusieurs coups vite
 const POSITION_DEBOUNCE_MS = 250;
 
-/**
- * Recommandations de l'agent pour la position affichée.
- * Chaque flux est piloté par l'état de la partie : un nouveau coup annule la requête précédente
- * (switchMap), la réponse ne peut donc jamais correspondre à une autre position que celle affichée.
- */
+// switchMap : un nouveau coup annule la requête d'avant
 @Injectable({ providedIn: 'root' })
 export class CoachStore {
   private readonly api = inject(CoachApiService);
@@ -24,7 +20,7 @@ export class CoachStore {
   private readonly contextRetry = signal(0);
   private readonly extraVideosRequest = signal<string | null>(null);
 
-  /** Nom d'ouverture renvoyé par Lichess pour chaque position déjà analysée (clé : positionKey) */
+  // nom Lichess par position
   private readonly openingByFen = signal(new Map<string, string>());
 
   private readonly fen$ = toObservable(this.game.fen).pipe(debounceTime(POSITION_DEBOUNCE_MS), distinctUntilChanged());
@@ -42,7 +38,7 @@ export class CoachStore {
     { initialValue: LOADING as LoadState<MovesResponse> },
   );
 
-  /** Dernière ouverture nommée sur le chemin joué : reste affichée quand on sort de la théorie */
+  // garde le nom quand on sort de la théorie
   readonly openingName = computed(() => {
     const known = this.openingByFen();
     const fens = this.game.plies().slice(0, this.game.cursor()).map((p) => positionKey(p.fen));
@@ -60,7 +56,7 @@ export class CoachStore {
     { initialValue: IDLE as LoadState<Evaluation> },
   );
 
-  /** Un seul appel par ouverture (et non par coup) : le contexte ne change que si l'ouverture change */
+  // un appel par ouverture, pas par coup
   readonly context = toSignal(
     combineLatest([toObservable(this.openingName).pipe(distinctUntilChanged()), toObservable(this.contextRetry)]).pipe(
       switchMap(([name]): Observable<LoadState<VectorSearchResponse>> =>
@@ -70,10 +66,7 @@ export class CoachStore {
     { initialValue: IDLE as LoadState<VectorSearchResponse> },
   );
 
-  /**
-   * Vidéos : fournies par /vector-search quand l'ouverture est au catalogue.
-   * Sinon (ex. "King's Pawn Game"), seulement à la demande, pour ne pas consommer le quota YouTube.
-   */
+  // hors catalogue : vidéos seulement si on clique (quota)
   private readonly extraVideos = toSignal(
     toObservable(this.extraVideosRequest).pipe(
       switchMap((name): Observable<LoadState<VideosResponse>> => (name ? withLoadState(this.api.videos(name)) : of(IDLE))),
@@ -90,7 +83,6 @@ export class CoachStore {
     return IDLE;
   });
 
-  /** On peut proposer une recherche de vidéos manuelle pour une ouverture hors catalogue */
   readonly canSearchVideos = computed(() => {
     const context = this.context();
     return !!this.openingName() && context.status !== 'loading' && this.videos().status === 'idle';

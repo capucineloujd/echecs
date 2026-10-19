@@ -5,11 +5,7 @@ import { samePosition } from '../core/game.store';
 const MIN_SIZE = 260;
 const MAX_SIZE = 640;
 
-/**
- * Enveloppe de ngx-chess-board.
- * L'échiquier ne fait qu'afficher la position du GameStore et remonter les coups joués à la souris :
- * c'est le store (chess.js) qui décide si le coup est accepté.
- */
+// affiche le GameStore, c'est le store qui valide les coups
 @Component({
   selector: 'app-chess-board',
   imports: [NgxChessBoardModule],
@@ -32,7 +28,7 @@ const MAX_SIZE = 640;
       width: 100%;
     }
     ngx-chess-board {
-      /* La librairie force inline-block : sans ça, un espace apparaît sous l'échiquier */
+      /* enlève l'espace sous l'échiquier */
       vertical-align: top;
     }
   `,
@@ -40,12 +36,11 @@ const MAX_SIZE = 640;
 export class ChessBoardComponent {
   readonly fen = input.required<string>();
   readonly orientation = input<'white' | 'black'>('white');
-  /** FEN de l'échiquier après un coup joué à la souris */
   readonly moved = output<string>();
 
   protected readonly size = signal(480);
   private readonly board = viewChild.required<NgxChessBoardComponent>('board');
-  /** Ce que ngx-chess-board affiche réellement (sa FEN interne n'est pas fiable après setFEN) */
+  // la FEN interne de la lib n'est pas fiable après setFEN
   private shownFen = '';
   private reversed = false;
 
@@ -81,7 +76,6 @@ export class ChessBoardComponent {
     this.moved.emit(event.fen);
   }
 
-  /** Remet l'échiquier sur la position du store (coup refusé par chess.js) */
   resync(): void {
     this.board().setFEN(this.fen());
     this.shownFen = this.fen();

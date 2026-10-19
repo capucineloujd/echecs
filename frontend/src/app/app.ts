@@ -34,7 +34,7 @@ export class App {
 
   protected onBoardMove(boardFen: string): void {
     if (!this.game.playFromBoardFen(boardFen)) {
-      // Coup que chess.js ne reconnaît pas : on remet l'échiquier d'accord avec l'état de la partie
+      // coup refusé : on remet l'échiquier
       this.board().resync();
     }
   }

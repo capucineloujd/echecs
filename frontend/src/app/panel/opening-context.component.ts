@@ -2,7 +2,6 @@ import { Component, computed, input, output, signal } from '@angular/core';
 import { VectorSearchResponse } from '../core/api.models';
 import { LoadState } from '../core/load-state';
 
-/** Fiche de l'ouverture : passages Wikibooks / Wikipédia retrouvés dans Milvus */
 @Component({
   selector: 'app-opening-context',
   template: `
@@ -73,7 +72,7 @@ export class OpeningContextComponent {
     return s.status === 'ok' ? s.data : null;
   });
 
-  /** Ouverture du catalogue (nom français) ; le nom Lichess, plus précis, reste affiché dessous */
+  // nom français du catalogue
   protected readonly detected = computed(() => this.response()?.detected_opening ?? null);
 
   protected readonly errorText = computed(() => {

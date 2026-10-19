@@ -1,4 +1,4 @@
-// Événements SSE de POST /api/v1/agent/analyze (backend/app/agent/runner.py)
+// événements SSE de l'agent
 export type AgentEvent =
   | { event: 'tool_start'; id: string; name: string; args: Record<string, unknown> }
   | { event: 'tool_end'; id: string; name: string; status: 'success' | 'error' }
@@ -12,7 +12,7 @@ export interface AgentRequest {
   question: string | null;
 }
 
-/** Découpe un flux SSE en événements complets ; renvoie aussi le texte non encore terminé */
+// découpe le flux SSE, renvoie aussi le reste pas fini
 export function parseSse(buffer: string): { events: AgentEvent[]; rest: string } {
   const blocks = buffer.split('\n\n');
   const rest = blocks.pop() ?? '';
