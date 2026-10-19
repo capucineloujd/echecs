@@ -36,6 +36,8 @@ def get_position_analysis(
     return PositionAnalysisService(settings, lichess, stockfish)
 
 
+
+
 def get_agent(request: Request):
     agent = getattr(request.app.state, "agent", None)
     if agent is None:

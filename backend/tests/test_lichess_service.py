@@ -8,6 +8,8 @@ from app.services.lichess import LichessExplorerService
 
 URL = "https://explorer.lichess.ovh"
 
+
+
 E4_RESPONSE = {
     "white": 600,
     "draws": 300,
@@ -26,6 +28,8 @@ def board():
     b = chess.Board()
     b.push_san("e4")
     return b
+
+
 
 
 @pytest.fixture

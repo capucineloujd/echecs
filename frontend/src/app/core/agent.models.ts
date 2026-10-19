@@ -12,7 +12,7 @@ export interface AgentRequest {
   question: string | null;
 }
 
-// découpe le flux SSE, renvoie aussi le reste pas fini
+// découpe le flux SSe renvoie aussi le reste pas fini
 export function parseSse(buffer: string): { events: AgentEvent[]; rest: string } {
   const blocks = buffer.split('\n\n');
   const rest = blocks.pop() ?? '';

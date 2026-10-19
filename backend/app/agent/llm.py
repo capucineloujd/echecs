@@ -4,6 +4,7 @@ from langchain_core.language_models import BaseChatModel
 
 from app.config import Settings
 
+
 logger = logging.getLogger(__name__)
 
 

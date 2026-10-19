@@ -11,6 +11,8 @@ RUN apt-get update \
 
 WORKDIR /app
 
+
+
 # torch en version CPU 
 RUN pip install --no-cache-dir --index-url https://download.pytorch.org/whl/cpu torch==2.14.1
 
@@ -22,6 +24,8 @@ COPY scripts ./scripts
 COPY data ./data
 
 EXPOSE ${BACKEND_PORT}
+
+
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
     CMD python -c "import os, urllib.request; urllib.request.urlopen(f'http://localhost:{os.environ[\"BACKEND_PORT\"]}/api/v1/healthcheck')"

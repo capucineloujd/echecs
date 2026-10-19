@@ -7,7 +7,7 @@ import { AgentEvent, AgentRequest, parseSse } from './agent.models';
 export class AgentService {
   private readonly http = inject(HttpClient);
 
-  // streaming via DownloadProgress
+  // streaming via downloadprogress
   analyze(request: AgentRequest): Observable<AgentEvent> {
     let consumed = 0;
     let pending = '';

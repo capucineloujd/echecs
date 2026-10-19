@@ -8,6 +8,7 @@ def catalog():
     return OpeningCatalog.load()
 
 
+
 @pytest.mark.parametrize(
     "query, slug",
     [
@@ -22,6 +23,8 @@ def catalog():
 )
 def test_detect_opening(catalog, query, slug):
     assert catalog.detect(query).slug == slug
+
+
 
 
 def test_detect_nothing(catalog):
@@ -41,6 +44,8 @@ class FakeEmbedder:
         return [0.0] * 4
 
 
+
+
 def hit(slug, score, text):
     return {"score": score, "opening_slug": slug, "opening_name": slug.title(), "eco": "C60", "fen": "",
             "section": "Histoire", "source": "wikipedia_fr", "lang": "fr", "url": "https://x", "text": text}
@@ -55,8 +60,10 @@ class FakeStore:
         return self.by_filter.get(opening_slug, [])
 
 
+
 def run(graph, query, **kwargs):
     return graph.ainvoke({"query": query, "top_k": 3, "min_score": 0.35, **kwargs})
+
 
 
 async def test_graph_filters_on_detected_opening(catalog):

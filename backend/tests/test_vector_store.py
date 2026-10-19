@@ -9,7 +9,6 @@ class MissingCollectionClient:
     def search(self, *args, **kwargs):
         raise MilvusException(code=100, message="collection not found[database=default][collection=opening_chunks]")
 
-
 def test_missing_collection_explains_how_to_ingest():
     store = VectorStoreService("http://milvus:19530", "opening_chunks")
     store._client = MissingCollectionClient()

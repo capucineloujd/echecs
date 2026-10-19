@@ -65,6 +65,7 @@ async def lifespan(app: FastAPI):
     await app.state.lichess.close()
 
 
+
 def build_agent(app: FastAPI):
     model = build_chat_model(settings)
     if model is None:
@@ -90,6 +91,8 @@ app.include_router(openings.router, prefix=settings.api_v1_prefix)
 app.include_router(vector_search.router, prefix=settings.api_v1_prefix)
 app.include_router(videos.router, prefix=settings.api_v1_prefix)
 app.include_router(agent.router, prefix=settings.api_v1_prefix)
+
+
 
 
 @app.exception_handler(InvalidFenError)

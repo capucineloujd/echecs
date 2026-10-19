@@ -9,6 +9,7 @@ from app.schemas import EngineLine, Evaluation, Score
 logger = logging.getLogger(__name__)
 
 
+
 class StockfishService:
     def __init__(self, settings: Settings):
         self._settings = settings

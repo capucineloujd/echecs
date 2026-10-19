@@ -14,7 +14,6 @@ async def engine():
     yield service
     await service.stop()
 
-
 async def test_starting_position_is_balanced(engine):
     evaluation = await engine.evaluate(chess.Board(), multipv=2)
     assert abs(evaluation.score.centipawns) < 100
@@ -26,6 +25,8 @@ async def test_score_is_from_white_point_of_view(engine):
     evaluation = await engine.evaluate(board)
     assert evaluation.side_to_move == "black"
     assert evaluation.score.mate is not None and evaluation.score.mate > 0 or evaluation.score.centipawns > 500
+
+
 
 
 async def test_mate_in_one(engine):

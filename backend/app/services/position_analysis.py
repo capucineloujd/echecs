@@ -3,6 +3,7 @@ import logging
 import chess
 
 from app.config import Settings
+
 from app.core.errors import LichessRateLimitError, LichessUnavailableError
 from app.schemas import MovesResponse
 from app.services.lichess import LichessExplorerService

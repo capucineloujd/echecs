@@ -17,7 +17,7 @@ async def vector_search(
     videos: bool = Query(True, description="Proposer des vidéos YouTube sur l'ouverture détectée"),
     graph=Depends(get_rag_graph),
 ):
-    """Recherche dans les articles indexés dans Milvus"""
+    """Recherche dans les articles indexé dans Milvus"""
     state = await graph.ainvoke(
         {
             "query": query,

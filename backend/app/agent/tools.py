@@ -87,7 +87,7 @@ def format_moves(board: chess.Board, result: MovesResponse, catalog: OpeningCata
     opening = (
         f"{french_name(catalog, result.opening.name)}, code ECO {result.opening.eco}"
         if result.opening
-        else "non nommée par Lichess (reprendre le nom donné pour les coups précédents s'il y en a un)"
+        else "non nommée par Lichess (reprendre le nom donné pour les coups précédents s'il y en a 1)"
     )
     if result.in_theory:
         base = "parties de maîtres" if result.database == "masters" else "parties en ligne Lichess"
@@ -105,7 +105,7 @@ def format_moves(board: chess.Board, result: MovesResponse, catalog: OpeningCata
                 f"  {move.san} : joué dans {share} % des parties ; ensuite les {side(board.turn)} gagnent {own} %, "
                 f"nulles {move.draw_pct} %, les {side(not board.turn)} gagnent {other} %"
             )
-        lines.append("Le coup le plus fréquent est la référence ; des pourcentages proches sont normaux en ouverture.")
+        lines.append("Le coup le plus fréquent est la référence ; des pourcentages proches sont normaux en ouverture")
         return "\n".join(lines)
     reason = result.warning or f"position sortie de la théorie (seulement {result.total_games} parties connues)"
     engine = format_engine(board, result.engine) if result.engine else "Évaluation indisponible."
@@ -124,15 +124,13 @@ def build_tools(
 ):
     @tool
     async def get_position_moves(state: Annotated[dict, InjectedState]) -> str:
-        """Coups théoriques de la position actuelle (Lichess, parties de maîtres) avec le nom de
-        l'ouverture. Si la position est sortie de la théorie, renvoie l'analyse Stockfish à la place."""
+        """Coups théoriques de la position actuelle (Lichess, parties de maîtres) avec le nom de l'ouverture. Si la position est sortie de la théorie, renvoie l'analyse Stockfish à la place."""
         board = chess.Board(state["fen"])
         return format_moves(board, await analysis.analyze(board), catalog)
 
     @tool
     async def evaluate_position(state: Annotated[dict, InjectedState], move_san: str | None = None) -> str:
-        """Évaluation Stockfish de la position actuelle, ou de la position après le coup `move_san`
-        (notation anglaise, ex. "Nxd5") pour vérifier un coup précis."""
+        """Évaluation Stockfish de la position actuelle, ou de la position après le coup `move_san` (notation anglaise, ex. "Nxd5") pour vérifier un coup précis."""
         board = chess.Board(state["fen"])
         prefix = ""
         if move_san:
@@ -148,8 +146,7 @@ def build_tools(
 
     @tool
     async def search_opening_knowledge(query: str) -> str:
-        """Recherche dans les articles Wikibooks / Wikipédia sur les ouvertures (idées, plans,
-        pièges, histoire). `query` doit contenir le nom de l'ouverture, ex. "plans de la partie espagnole"."""
+        """Recherche dans les articles Wikibooks / Wikipédia sur les ouvertures . `query` doit contenir le nom de l'ouverture."""
         if rag_graph is None:
             return "Base documentaire indisponible."
         state = await rag_graph.ainvoke(
@@ -164,8 +161,7 @@ def build_tools(
 
     @tool
     async def find_videos(opening: str) -> str:
-        """Vidéos YouTube pédagogiques sur une ouverture (nom de l'ouverture, ex. "Défense sicilienne").
-        Consomme du quota : à n'utiliser que si l'élève veut des vidéos."""
+        """Vidéos YouTube pédagogiques sur une ouverture . Consomme du quota : à n'utiliser que si l'élève veut des vidéos."""
         if youtube is None:
             return "Recherche de vidéos indisponible."
         result = await youtube.find_videos(opening)

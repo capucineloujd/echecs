@@ -11,6 +11,7 @@ from app.schemas import Opening, TheoryMove
 logger = logging.getLogger(__name__)
 
 
+
 class ExplorerResult:
     def __init__(self, opening: Opening | None, total_games: int, moves: list[TheoryMove]):
         self.opening = opening
@@ -35,6 +36,7 @@ class LichessExplorerService:
 
     async def close(self) -> None:
         await self._client.aclose()
+        
 
     async def get_theory_moves(self, board: chess.Board, database: str | None = None) -> ExplorerResult:
         database = database or self._settings.lichess_database

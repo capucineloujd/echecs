@@ -5,12 +5,12 @@ import re
 import urllib.parse
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
-
 import httplib2
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
 from app.config import Settings
+
 from app.rag.catalog import OpeningCatalog, OpeningInfo, normalize
 from app.schemas import Video, VideosResponse
 from app.services.cache import Cache
@@ -18,6 +18,7 @@ from app.services.cache import Cache
 logger = logging.getLogger(__name__)
 
 QUOTA_KEY = "youtube:quota_blocked_until"
+
 GENERIC_WORDS = {"variation", "variante", "defense", "defence", "opening", "game", "partie", "line", "system"}
 
 
@@ -31,7 +32,7 @@ class YouTubeClient:
         self._timeout = timeout
 
     def _service(self):
-        # un client par appel (pas thread-safe)
+        # un client / appel (pas thread-safe)
         return build(
             "youtube", "v3", developerKey=self._api_key, http=httplib2.Http(timeout=self._timeout),
             cache_discovery=False, static_discovery=True,
@@ -64,6 +65,7 @@ def parse_duration(iso: str) -> int:
         return 0
     days, hours, minutes, seconds = (int(g or 0) for g in match.groups())
     return ((days * 24 + hours) * 60 + minutes) * 60 + seconds
+
 
 
 def format_duration(seconds: int) -> str:

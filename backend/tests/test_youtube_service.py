@@ -121,13 +121,15 @@ async def test_cache_avoids_second_call(catalog):
     assert second.videos == first.videos
 
 
+
+
+
 async def test_no_results(catalog):
     client = FakeClient({"fr": [], "en": []})
     result = await service(catalog, client).find_videos("scandinave")
     assert result.status == "no_results"
     assert result.videos == []
     assert result.fallback_search_url.startswith("https://www.youtube.com/results?search_query=Scandinavian")
-
 
 async def test_quota_exceeded_blocks_next_calls(catalog):
     client = FakeClient({}, error=quota_error())
@@ -145,6 +147,7 @@ async def test_quota_exceeded_blocks_next_calls(catalog):
 async def test_network_error_is_unavailable(catalog):
     result = await service(catalog, FakeClient({}, error=TimeoutError())).find_videos("italienne")
     assert result.status == "unavailable"
+
 
 
 async def test_missing_api_key(catalog):
@@ -169,6 +172,7 @@ def test_relevance_terms_for_lichess_names():
     assert relevance_terms("Sicilian Defense: Najdorf Variation", None) == ["sicilian", "najdorf"]
 
 
+
 @pytest.mark.parametrize("iso, seconds", [("PT45S", 45), ("PT12M30S", 750), ("PT1H2M3S", 3723), ("P1DT1H", 90000), ("", 0)])
 def test_parse_duration(iso, seconds):
     assert parse_duration(iso) == seconds
@@ -177,6 +181,7 @@ def test_parse_duration(iso, seconds):
 def test_format_duration():
     assert format_duration(750) == "12:30"
     assert format_duration(3723) == "1:02:03"
+
 
 
 def test_quota_reset_is_next_pacific_midnight():

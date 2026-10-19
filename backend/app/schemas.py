@@ -1,11 +1,9 @@
 from typing import Literal
 from pydantic import BaseModel, Field
 
-
 class Opening(BaseModel):
     eco: str
     name: str
-
 
 class TheoryMove(BaseModel):
     uci: str

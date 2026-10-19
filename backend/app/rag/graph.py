@@ -4,6 +4,7 @@ from langgraph.graph import END, START, StateGraph
 
 from app.rag.catalog import OpeningCatalog, OpeningInfo
 from app.schemas import VideosResponse
+
 from app.services.vector_store import VectorStoreService
 
 if TYPE_CHECKING:

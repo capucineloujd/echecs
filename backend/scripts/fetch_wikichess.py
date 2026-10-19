@@ -2,12 +2,13 @@ import json
 import sys
 import time
 from pathlib import Path
-
 import chess
 import httpx
 
 DATA_DIR = Path(__file__).resolve().parent.parent / "data"
+
 CATALOG = DATA_DIR / "openings_catalog.json"
+
 RAW_DIR = DATA_DIR / "raw"
 
 SOURCES = {

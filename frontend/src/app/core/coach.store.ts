@@ -9,7 +9,7 @@ import { IDLE, LOADING, LoadState, withLoadState } from './load-state';
 // attendre un peu si on joue plusieurs coups vite
 const POSITION_DEBOUNCE_MS = 250;
 
-// switchMap : un nouveau coup annule la requête d'avant
+// switchMap : un nouveau coup annul la requête d'avant
 @Injectable({ providedIn: 'root' })
 export class CoachStore {
   private readonly api = inject(CoachApiService);
@@ -20,7 +20,7 @@ export class CoachStore {
   private readonly contextRetry = signal(0);
   private readonly extraVideosRequest = signal<string | null>(null);
 
-  // nom Lichess par position
+  // nom Lichess / position
   private readonly openingByFen = signal(new Map<string, string>());
 
   private readonly fen$ = toObservable(this.game.fen).pipe(debounceTime(POSITION_DEBOUNCE_MS), distinctUntilChanged());
@@ -56,7 +56,7 @@ export class CoachStore {
     { initialValue: IDLE as LoadState<Evaluation> },
   );
 
-  // un appel par ouverture, pas par coup
+  // un appel par ouverture, et non pas par coup
   readonly context = toSignal(
     combineLatest([toObservable(this.openingName).pipe(distinctUntilChanged()), toObservable(this.contextRetry)]).pipe(
       switchMap(([name]): Observable<LoadState<VectorSearchResponse>> =>

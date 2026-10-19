@@ -7,7 +7,7 @@ SKIPPED_SECTIONS = {
     "references", "notes", "notes et références", "bibliographie", "liens externes",
     "external links", "see also", "voir aussi", "articles connexes", "theory table",
     "statistics", "all possible black's moves", "all possible white's moves", "poème",
-}
+} 
 FOOTER = re.compile(r"^\s*Portail d[eu]s? .*$", re.M)
 
 

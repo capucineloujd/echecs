@@ -1,6 +1,5 @@
 import asyncio
 import json
-
 import chess
 import httpx
 from fastapi.testclient import TestClient
@@ -8,7 +7,6 @@ from langchain_core.language_models import BaseChatModel
 from langchain_core.outputs import ChatGeneration, ChatResult
 from langchain_core.messages import AIMessage
 from langchain_core.runnables import RunnableLambda
-
 from app.agent.graph import Decision, build_agent_graph
 from app.agent.prompts import describe_position
 from app.agent.runner import stream_agent
@@ -16,9 +14,12 @@ from app.agent.tools import build_tools, format_engine, format_moves, material_o
 from app.rag.catalog import OpeningCatalog
 from app.api.deps import get_agent
 from app.main import app
+
 from app.schemas import EngineLine, Evaluation, MovesResponse, Opening, Score, TheoryMove
 
 SPANISH = "r1bqkbnr/pppp1ppp/2n5/1B2p3/4P3/5N2/PPPP1PPP/RNBQK2R b KQkq - 3 3"
+
+
 
 
 class ScriptedModel(BaseChatModel):
