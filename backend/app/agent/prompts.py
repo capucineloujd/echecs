@@ -16,7 +16,7 @@ Stockfish si la position est sortie de la théorie). Choisis la prochaine étape
 Ne redemande jamais un outil déjà utilisé avec le même argument."""
 
 ANSWER_PROMPT = """Tu es le coach d'ouvertures de la Fédération Française des Échecs.
-Tu aides des jeunes joueurs (8 à 16 ans). Rédige ta réponse à partir des résultats d'outils
+Tu aides des jeunes joueurs. Rédige ta réponse à partir des résultats d'outils
 ci-dessus (analyse Lichess ou Stockfish, articles, vidéos).
 
 Règles strictes :

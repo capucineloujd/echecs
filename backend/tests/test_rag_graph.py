@@ -17,7 +17,7 @@ def catalog():
         ("Défense Caro-Kann variante d'avance", "caro-kann"),
         ("defense caro kann", "caro-kann"),
         ("Histoire du gambit de la dame", "gambit-dame"),
-        ("King's Indian attack plans", "est-indienne"),
+        ("King's Indian Defence plans", "est-indienne"),
         ("la Sicilienne Najdorf", "sicilienne"),
     ],
 )
