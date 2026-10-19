@@ -5,7 +5,7 @@ choisit lui-même ses sources et rédige un conseil adapté à un jeune joueur, 
 - la théorie des ouvertures (API Lichess Opening Explorer) ;
 - le contexte historique (Wikibooks Chess Opening Theory, indexé dans Milvus) ;
 - des vidéos explicatives (YouTube Data API) ;
-- une évaluation Stockfish quand la partie sort de la théorie.
+- une évaluation Stockfish quand la partie sort de la théorie
 
 ## Stack
 
@@ -48,7 +48,7 @@ choisit lui-même ses sources et rédige un conseil adapté à un jeune joueur, 
 │   ├── proxy.conf.json     proxy /api pour `npm start` en développement
 │   └── Dockerfile          build Node 24.18.1, service nginx 1.30.0
 ├── docker-compose.yml
-├── .env                configuration locale (non versionnée, à créer)
+├── .env             
 └── README.md
 ```
 
@@ -58,11 +58,11 @@ choisit lui-même ses sources et rédige un conseil adapté à un jeune joueur, 
 | Élément | Détail |
 |---|---|
 | Docker | Docker Desktop (ou Engine ≥ 25) avec Compose v2.20+ (`docker compose version`) |
-| Mémoire Docker | **12 Go minimum** |
-| Disque | ~env. 8 Go : images (env.5,5 Go) + modèle d'embedding (1,2 Go) + données |
+| Mémoire Docker | 12 Go minimum |
+| Disque | env. 8 Go : images (env.5,5 Go) + modèle d'embedding (1,2 Go) + données |
 | Ports libres | 4200 (interface), 8000 (API), 27017 (MongoDB), 19530 (Milvus) |
-| Token Lichess | Obligatoire |
-| Ollama | Pour le conseil du coach |
+| Token Lichess | Obligatoir |
+| Ollama | Pour le conseil du coache |
 | Clé YouTube | Facultative |
 
 
@@ -71,13 +71,6 @@ choisit lui-même ses sources et rédige un conseil adapté à un jeune joueur, 
 ```bash
 echo "LICHESS_TOKEN=lip_xxx" > .env
 echo "YOUTUBE_API_KEY=AIza..." >> .env
-```
-
-### Installer Ollama (sur la machine, hors Docker)
-
-```bash
-brew install ollama && brew services start ollama
-ollama pull qwen3:8b
 ```
 
 ### Construire et lancer
@@ -111,7 +104,7 @@ docker compose up -d backend
 |---|---|
 | `docker compose stop` | Arrête les conteneurs |
 | `docker compose up -d` | Relance (30 s jusqu'à `healthy`, sans ingestion ni téléchargement) |
-| `docker compose down` | Supprime les conteneurs mais garde les données |
+| `docker compose down` | Supprime les conteneurs MAIS garde les données |
 | `docker compose down -v` | Supprime aussi les volumes : index Milvus, cache, modèle |
 
 ## Endpoints
@@ -122,7 +115,7 @@ La FEN se passe directement dans l'URL. Les espaces peuvent être encodés
 | Endpoint | Rôle |
 |---|---|
 | `GET /api/v1/healthcheck` | État du service |
-| `GET /api/v1/moves/{fen}?database=masters\|lichess` | Coups théoriques Lichess (statistiques, ouverture ECO). Hors théorie, ou si Lichess est indisponible, la réponse contient l'évaluation Stockfish (`source: "stockfish"`). |
+| `GET /api/v1/moves/{fen}?database=masters\|lichess` | Coups théoriques Lichess (statistiques, ouverture ECO). si hors théorie, ou si Lichess est indisponible, la réponse contient l'évaluation Stockfish (`source: "stockfish"`). |
 | `GET /api/v1/evaluate/{fen}?depth=18&multipv=3` | Évaluation Stockfish : score en centipawns (ou mat en N) du point de vue des Blancs, meilleur coup, meilleures lignes |
 | `GET /api/v1/openings` | Ouvertures du catalogue (slug, nom, ECO, coups, FEN), pour le menu de l'interface |
 | `GET /api/v1/vector-search?query=...&opening=...&top_k=5&videos=true` | Recherche vectorielle dans les articles d'ouvertures (Milvus). Renvoie les passages les plus pertinents avec leur source, un champ `context` prêt pour un LLM et, si une ouverture est reconnue, des vidéos YouTube. |
@@ -144,12 +137,10 @@ Codes erreur : `422` FEN invalide · `502` token Lichess absent/invalide ·
 
 ### Données
 
-10 ouvertures parmi les plus jouées (italienne, espagnole, écossaise,
-sicilienne, française, Caro-Kann, scandinave, gambit dame, est-indienne,
-anglaise), chacune avec deux sources complémentaires :
+10 ouvertures parmi les plus jouées (italienne, espagnole, écossaise, sicilienne, française, Caro-Kann, scandinave, gambit dame, est-indienne, anglaise), chacune avec deux sources complémentaires :
 
-- **Wikibooks *Chess Opening Theory*** (EN) : théorie coup par coup et plans ;
-- **Wikipédia FR** : histoire, contexte, joueurs emblématiques.
+- Wikibooks(EN) : théorie coup par coup et plans ;
+- Wikipédia FR : histoire, contexte, joueurs connus
 
 ### Pipeline
 
@@ -157,7 +148,7 @@ anglaise), chacune avec deux sources complémentaires :
    `Variantes > La variante Winawer` est conservé), paragraphes regroupés
    jusqu'à 1 200 caractères, avec reprise du dernier paragraphe pour garder
    le fil. Les sections sans valeur (références, bibliographie, liens,
-   tableaux) sont écartées. Résultat : env 180 passages.
+   tableaux) sont enelvées. Résultat : env 180 passages (183).
 2. Embeddings : `Qwen/Qwen3-Embedding-0.6B` (sentence-transformers,
    dimension 1024, multilingue). Le texte vectorisé est préfixé par
    l'ouverture et la section pour qu'un passage isolé reste rattaché à son
@@ -170,13 +161,12 @@ anglaise), chacune avec deux sources complémentaires :
 - Le modèle est stocké en bfloat16, très lent sur CPU == on le charge en
   float32.
 - Laisser torch prendre tous les cœurs fait tomber Milvus (il perd son bail
-  etcd faute de CPU) : `EMBEDDING_THREADS=4` par défaut.
-- Ingestion des env 180 passages : 9 min sur CPU dans Docker
+  etcd faute de CPU) : `EMBEDDING_THREADS=4` par défaut
+- Ingestion des 180 passages : 9 min sur CPU dans Docker
 
 ### Qualité de la recherche
 
-Une consigne de requête spécifique aux échecs (recommandée par Qwen3-Embedding)
-améliore les scores. Constats sur quelques questions types :
+Une consigne de requête spécifique aux échecs (recommandée par Qwen3-Embedding) améliore les scores. Constats sur quelques questions types :
 
 - question sur une ouverture nommée ("histoire de la partie espagnole",
    variante Winawer") : passages pertinents;
@@ -191,8 +181,6 @@ detect_opening ──► retrieve ──┬──► format_results ──► EN
                       ▲       │
                       └─ widen_search  (si le filtre ne trouve rien de pertinent)
 ```
-
-(Branche vidéos en parallèle : voir [Vidéos YouTube](#vidéos-youtube).)
 
 - `detect_opening` reconnaît l'ouverture citée dans la question ("la
   Ruy Lopez", "défense caro kann"…) et restreint la recherche à celle-ci ;
@@ -218,7 +206,7 @@ curl -G localhost:8000/api/v1/vector-search --data-urlencode "query=Quelle est l
    les Shorts), au moins 5000 vues, titre citant l'ouverture.
 3. Classement : popularité (log des vues), ratio de likes, bonus pour le
    français, bonus pour les chaînes favorites (`YOUTUBE_PREFERRED_CHANNELS`),
-   bonus pour les titres citant la variante précise ; au plus 2 vidéos par
+   bonus pour les titres citant la variante précise ; au + 2 vidéos /
    chaîne.
 
 
@@ -281,9 +269,9 @@ Les choix suivants viennent de tests réels sur les positions de démo
 
 | Version testée | Résultat |
 |---|---|
-| React classique | Le modèle répond souventsans appeler d'outil : il a inventé une "partie italienne" dans une Najdorf, et n'a pas vérifié Nxd5 |
+| React classique | Le modèle répond souventsans appeler d'outil:il a inventé une "partie italienne" dans une Najdorf, et n'a pas vérifié Nxd5! |
 | + lecture de la position garantie au départ | Plus d'ouverture inventée, mais aucun outil supplémentaire appelé |
-| + mode "réflexion" de Qwen3 | Vérifie parfois le coup, mais réponses 2 à 4 fois plus lentes et chiffres inventés |
+| + mode "réflexion" de Qwen3 | Vérifie parfois le coup, mais réponses plus lentes et chiffres inventés |
 | Qwen3 30B-A3B | N'arrive pas à désactiver sa réflexion : elle apparaît dans la réponse (en anglais), jusqu'à 66 s |
 | Décision explicite à chaque tour (version retenue) | Bons outils dans les 5 cas testés, réponses en 8 à 15 s |
 
@@ -298,8 +286,7 @@ Les choix suivants viennent de tests réels sur les positions de démo
 | 1.a3 h5 2.Ra2 Rh6 | lecture | 8 s |
 | Najdorf, "quels sont les plans ?" | lecture + articles | 14 s |
 
-Limites connues d'un modèle de 8 milliards de paramètres : formulations
-parfois approximatives !
+Limites connues d'un modèle de 8 milliards de paramètres : formulations parfois approximatives !
 
 
 ### Logique métier séparée de l'API
@@ -348,7 +335,7 @@ Stockfish si Lichess est indisponible) est dans
 | Cache LRU par FEN (`RequestCache`) | Revenir sur une position déjà vue ne refait pas d'appel ; requêtes identiques partagées |
 | Annulation | Une requête qui n'a plus d'abonné est annulée ; les erreurs ne sont pas mises en cache |
 | Contexte par ouverture | `/vector-search` n'est appelé que quand le nom d'ouverture change, pas à chaque coup ; le nom reste affiché hors théorie |
-| Vidéos à la demande | Pour une ouverture hors catalogue (ex. "King's Pawn Game"), bouton "Chercher des vidéos" au lieu d'un appel automatique qui consommerait le quota YouTube |
+| Vidéos à la demande | Pour une ouverture hors catalogue, bouton "Chercher des vidéos" au lieu d'un appel automatique qui consommerait le quota YouTube |
 | Stockfish optionnel | `/evaluate` n'est appelé que si "Évaluation Stockfish" est cochée |
 
 ### Conseil du coach
@@ -382,19 +369,12 @@ Le nom de projet est fixé (`name: echecs`), donc les volumes s'appellent
 
 | Volume | Monté dans | Contenu |
 |---|---|---|
-| `echecs_hf_models` | `backend:/models` | Modèle Qwen3-Embedding (1,2 Go), téléchargé 1 seule fois |
+| `echecs_hf_models` | `backend:/models` | Modèle Qwen3-Embedding (1,2 Go), téléchargé 1 seul fois |
 | `echecs_etcd_data` | `etcd:/etcd` | Métadonnées Milvus |
 | `echecs_minio_data` | `minio:/minio_data` | Vecteurs et segments Milvus |
 | `echecs_milvus_data` | `milvus:/var/lib/milvus` | Données locales de Milvus |
 | `echecs_mongo_data` | `mongodb:/data/db` | Cache des réponses YouTube |
 
-
-Vérifier :
-
-```bash
-docker volume ls --filter name=echecs_
-docker volume inspect echecs_minio_data      # Mountpoint, labels du projet compose
-```
 
 Tester la persistance en recréant tous les conteneurs :
 
@@ -404,7 +384,7 @@ docker compose up -d
 # l'index est toujours là (183 passages)
 docker exec echecs-backend python -c "from pymilvus import MilvusClient; \
   print(MilvusClient('http://milvus:19530').get_collection_stats('opening_chunks'))"
-# le cache YouTube aussi : réponse instantanée, "cached": true, "quota_units_used": 0
+# le cache YouTube aussi 
 curl -s localhost:8000/api/v1/videos/espagnole | grep -o '"cached":[a-z]*'
 ```
 
@@ -418,7 +398,7 @@ montrer la même chose directement dans l'API (`/docs` ou `curl`).
 
 | # | Position | Coups | Ce qu'elle montre |
 |---|---|---|---|
-| 1 | Partie espagnole | 1.e4 e5 2.Nf3 Nc6 3.Bb5 | Le cas nominal : théorie des maîtres (162 000 parties, a6 joué à 71 %), fiche de l'ouverture (histoire, Wikibooks + Wikipédia), vidéos en français lisibles dans la page |
+| 1 | Partie espagnole | 1.e4 e5 2.Nf3 Nc6 3.Bb5 | Le cas nominal : théorie des maîtres (162 000 parties, a6 joué à 71%), fiche de l'ouverture (histoire, Wikibooks + Wikipédia), vidéos en français lisibles dans la page |
 | 2 | Sicilienne Najdorf | 1.e4 c5 2.Nf3 d6 3.d4 cxd4 4.Nxd4 Nf6 5.Nc3 a6 | Nom précis de variante donné par Lichess ("Sicilian Defense: Najdorf Variation") rattaché à la fiche "Défense sicilienne" du catalogue |
 | 3 | Attaque Fried Liver | Menu "Partie italienne", puis 3...Nf6 4.Ng5 d5 5.exd5 Nxd5 6.Nxf7 | Un piège classique pour jeunes joueurs : un seul coup possible (Kxf7, 100 %). Le nom d'ouverture reste affiché sur les positions que Lichess ne nomme pas |
 | 4 | Piège de l'éléphant | Menu "Gambit dame", puis 2...e6 3.Nc3 Nf6 4.Bg5 Nbd7 5.cxd5 exd5, puis 6.Nxd5?? à la souris | Sortie de la théorie : Stockfish prend le relais, "avantage décisif aux Noirs" (−3,9), ligne Nxd5 Bxd8 Bb4+ : les Noirs gagnent une pièce |
@@ -434,18 +414,15 @@ fichier `.env` à la racine (non versionné). Variables utiles à l'installation
 
 | Variable | Défaut | Rôle |
 |---|---|---|
-| `LICHESS_TOKEN` | *(vide)* | Token personnel Lichess (obligatoire pour `/moves`) |
-| `YOUTUBE_API_KEY` | *(vide)* | Clé YouTube Data API v3 (nécessaire pour les vidéos) |
+| `LICHESS_TOKEN` | vide | Token personnel Lichess (obligatoire pour `/moves`) |
+| `YOUTUBE_API_KEY` | vide | Clé YouTube Data API v3 (nécessaire pour les vidéos) |
 | `FRONTEND_HOST_PORT` | `4200` | Port de l'interface sur la machine hôte |
 | `BACKEND_HOST_PORT` | `8000` | Port de l'API sur la machine hôte |
 | `MONGO_HOST_PORT` | `27017` | Port MongoDB sur la machine hôte |
-| `MILVUS_HOST_PORT` | `19530` | Port Milvus sur la machine hôte |
+| `MILVUS_HOST_PORT` | `19530` | Port Milvus sur la machine |
 | `LLM_PROVIDER` | `ollama` | LLM du coach : `ollama` (local) ou `mistral` (API, avec `MISTRAL_API_KEY`) |
 | `OLLAMA_MODEL` | `qwen3:8b` | Modèle Ollama utilisé par le coach |
 
-Les autres réglages (seuils, timeouts, filtres YouTube, profondeur Stockfish,
-paramètres du RAG et de l'agent) ont des valeurs par défaut, modifiables dans
-`.env` : voir `backend/app/config.py`.
 
 ### Ports
 
